@@ -29,7 +29,7 @@ struct LoginView: View {
             )
             .ignoresSafeArea()
             
-            VStack(spacing: 40) {
+            VStack(spacing: 10) {
                 Spacer()
                 
                 Image("logoApp")
@@ -139,10 +139,33 @@ struct LoginView: View {
                     )
                     .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
                     .disabled(isAuthenticating || !authManager.isBiometricAuthenticationAvailable())
+                    
+                    // "¿Olvidaste tu contraseña?"
+                    Button(action: forgotPasswordAction) {
+                        Text("¿Olvidaste tu contraseña?")
+                            .font(.system(.footnote, design: .default, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.top, 8)
                 }
                 .padding(.horizontal, 36)
                 
                 Spacer()
+                
+                // Nuevo Usuario
+                HStack(spacing: 4) {
+                    Text("¿No tienes cuenta?")
+                        .font(.system(.footnote, design: .default, weight: .regular))
+                        .foregroundStyle(.secondary)
+                    
+                    Button(action: signUpAction) {
+                        Text("Registrarse")
+                            .font(.system(.footnote, design: .default, weight: .semibold))
+                            .foregroundStyle(.blue)
+                    }
+                }
+                .padding(.bottom, 20)
+                
                 Spacer()
             }
         }
@@ -211,6 +234,14 @@ struct LoginView: View {
         alertTitle = title
         alertMessage = message
         showingAlert = true
+    }
+    
+    private func forgotPasswordAction() {
+        // Aquí se implementará la lógica para recuperar contraseña
+    }
+    
+    private func signUpAction() {
+        // Aquí se implementará la navegación a la pantalla de registro
     }
 }
 
