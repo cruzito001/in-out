@@ -139,18 +139,20 @@ struct LoginView: View {
                     )
                     .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
                     .disabled(isAuthenticating || !authManager.isBiometricAuthenticationAvailable())
-                    
-                    // "¿Olvidaste tu contraseña?"
+                }
+                .padding(.horizontal, 36)
+                
+                Spacer()
+                
+                // "¿Olvidaste tu contraseña?
+                VStack {
                     Button(action: forgotPasswordAction) {
                         Text("¿Olvidaste tu contraseña?")
                             .font(.system(.footnote, design: .default, weight: .medium))
                             .foregroundStyle(.secondary)
                     }
-                    .padding(.top, 8)
+                    .padding(.bottom, 8)
                 }
-                .padding(.horizontal, 36)
-                
-                Spacer()
                 
                 // Nuevo Usuario
                 HStack(spacing: 4) {
