@@ -8,15 +8,15 @@
 import SwiftUI
 
 struct CustomTabBar: View {
-    @State private var selectedTab: Int = 0
+    @State private var selectedTab = 0
     
     var body: some View {
         HStack(spacing: 0) {
             HStack(spacing: 0) {
-                // Tab 1: Inicio
+                // Tab 1 - Gestión
                 TabBarItem(
-                    icon: "house.fill",
-                    title: "Inicio",
+                    icon: "chart.pie.fill",
+                    title: "Gestión",
                     isSelected: selectedTab == 0
                 ) {
                     withAnimation(.easeInOut(duration: 0.3)) {
@@ -24,10 +24,10 @@ struct CustomTabBar: View {
                     }
                 }
                 
-                // Tab 2: Explorar
+                // Tab 2 - División
                 TabBarItem(
-                    icon: "magnifyingglass",
-                    title: "Explorar",
+                    icon: "divide.circle.fill",
+                    title: "División",
                     isSelected: selectedTab == 1
                 ) {
                     withAnimation(.easeInOut(duration: 0.3)) {
@@ -35,10 +35,10 @@ struct CustomTabBar: View {
                     }
                 }
                 
-                // Tab 3: Favoritos
+                // Tab 3 - Ruleta
                 TabBarItem(
-                    icon: "heart.fill",
-                    title: "Favoritos",
+                    icon: "arrow.triangle.2.circlepath",
+                    title: "Ruleta",
                     isSelected: selectedTab == 2
                 ) {
                     withAnimation(.easeInOut(duration: 0.3)) {
