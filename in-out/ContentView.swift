@@ -8,8 +8,14 @@
 import SwiftUI
 
 struct ContentView: View {
+    @State private var showingRegister = false
+    
     var body: some View {
-        LoginView()
+        if showingRegister {
+            RegisterView(showingRegister: $showingRegister)
+        } else {
+            LoginView(showingRegister: $showingRegister)
+        }
     }
 }
 

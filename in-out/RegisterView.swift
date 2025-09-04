@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct RegisterView: View {
+    @Binding var showingRegister: Bool
     @State private var fullName = ""
     @State private var email = ""
     @State private var password = ""
@@ -28,17 +29,17 @@ struct RegisterView: View {
             
             ScrollView {
                 VStack(spacing: 20) {
-                    Spacer(minLength: 50)
                     
                     Image("logoApp")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 120, height: 120)
                         .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
+                        .padding(.top, 25)
 
                     Text("Crear Cuenta")
-                        .padding(.top, -30)
-                        .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                        .font(.system(.largeTitle, design: .rounded, weight:
+                                .bold))
                         .foregroundStyle(.primary)
                         .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
                     
@@ -177,11 +178,10 @@ struct RegisterView: View {
     }
     
     private func goToLoginAction() {
-        print("Navegar a LoginView")
-        // TODO: Implementar navegación a LoginView
+        showingRegister = false
     }
 }
 
 #Preview {
-    RegisterView()
+    RegisterView(showingRegister: .constant(true))
 }

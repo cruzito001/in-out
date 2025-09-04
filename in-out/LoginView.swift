@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct LoginView: View {
+    @Binding var showingRegister: Bool
     @State private var email = ""
     @State private var password = ""
     @State private var isAuthenticating = false
@@ -29,7 +30,7 @@ struct LoginView: View {
             )
             .ignoresSafeArea()
             
-            VStack(spacing: 10) {
+            VStack(spacing: 20) {
                 Spacer()
                 
                 Image("logoApp")
@@ -96,6 +97,29 @@ struct LoginView: View {
                     )
                     .shadow(color: .blue.opacity(0.3), radius: 12, x: 0, y: 6)
                     
+                    // "¿Olvidaste tu contraseña?
+                    VStack {
+                        Button(action: forgotPasswordAction) {
+                            Text("¿Olvidaste tu contraseña?")
+                                .font(.system(.footnote, design: .default, weight: .medium))
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.bottom, -15)
+                    }
+                    
+                    // Nuevo Usuario
+                    HStack(spacing: 4) {
+                        Text("¿No tienes cuenta?")
+                            .font(.system(.footnote, design: .default, weight: .regular))
+                            .foregroundStyle(.secondary)
+                        
+                        Button(action: signUpAction) {
+                            Text("Registrarse")
+                                .font(.system(.footnote, design: .default, weight: .semibold))
+                                .foregroundStyle(.blue)
+                        }
+                    }
+                    
                     // Línea coqueta separador
                     HStack {
                         Rectangle()
@@ -143,32 +167,6 @@ struct LoginView: View {
                 .padding(.horizontal, 36)
                 
                 Spacer()
-                
-                // "¿Olvidaste tu contraseña?
-                VStack {
-                    Button(action: forgotPasswordAction) {
-                        Text("¿Olvidaste tu contraseña?")
-                            .font(.system(.footnote, design: .default, weight: .medium))
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.bottom, 8)
-                }
-                
-                // Nuevo Usuario
-                HStack(spacing: 4) {
-                    Text("¿No tienes cuenta?")
-                        .font(.system(.footnote, design: .default, weight: .regular))
-                        .foregroundStyle(.secondary)
-                    
-                    Button(action: signUpAction) {
-                        Text("Registrarse")
-                            .font(.system(.footnote, design: .default, weight: .semibold))
-                            .foregroundStyle(.blue)
-                    }
-                }
-                .padding(.bottom, 20)
-                
-                Spacer()
             }
         }
         .alert(alertTitle, isPresented: $showingAlert) {
@@ -180,6 +178,14 @@ struct LoginView: View {
     
     private func loginAction() {
         
+    }
+    
+    private func forgotPasswordAction() {
+        // Aquí se implementará la lógica para recuperar contraseña
+    }
+    
+    private func signUpAction() {
+        showingRegister = true
     }
     
     private func faceIDAction() {
@@ -238,15 +244,8 @@ struct LoginView: View {
         showingAlert = true
     }
     
-    private func forgotPasswordAction() {
-        // Aquí se implementará la lógica para recuperar contraseña
-    }
-    
-    private func signUpAction() {
-        // Aquí se implementará la navegación a la pantalla de registro
-    }
 }
 
 #Preview {
-    LoginView()
+    LoginView(showingRegister: .constant(false))
 }
