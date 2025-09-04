@@ -138,19 +138,19 @@ struct LoginView: View {
                     .padding(.vertical, 8)
                     
                     // Botón FaceID
-                    Button(action: faceIDAction) {
+                    Button(action: { BiometricAuthenticationHelper.performBiometricAuthentication(authManager: authManager, isAuthenticating: $isAuthenticating, showAlert: showAlert) }) {
                         HStack(spacing: 12) {
                             if isAuthenticating {
                                 ProgressView()
                                     .scaleEffect(0.8)
                                     .tint(.primary)
                             } else {
-                                Image(systemName: getBiometricIcon())
+                                Image(systemName: BiometricAuthenticationHelper.getBiometricIcon(for: authManager))
                                     .font(.system(.title2, design: .default, weight: .medium))
                                     .foregroundStyle(.primary)
                             }
                             
-                            Text(isAuthenticating ? "Autenticando..." : getBiometricButtonText())
+                            Text(isAuthenticating ? "Autenticando..." : BiometricAuthenticationHelper.getBiometricButtonText(for: authManager))
                                 .font(.system(.headline, design: .rounded, weight: .medium))
                                 .foregroundStyle(.primary)
                         }
@@ -188,55 +188,7 @@ struct LoginView: View {
         showingRegister = true
     }
     
-    private func faceIDAction() {
-        guard authManager.isBiometricAuthenticationAvailable() else {
-            showAlert(title: "Biometría no disponible", message: "La autenticación biométrica no está disponible en este dispositivo.")
-            return
-        }
-        
-        isAuthenticating = true
-        
-        Task {
-            let result = await authManager.authenticateWithBiometrics()
-            
-            await MainActor.run {
-                isAuthenticating = false
-                
-                switch result {
-                case .success(let success):
-                    if success {
-                        // Autenticación exitosa
-                        showAlert(title: "¡Éxito!", message: "Autenticación biométrica exitosa. Bienvenido a la aplicación.")
-                        // Aquí puedes navegar a la siguiente pantalla o realizar la acción de login
-                    }
-                case .failure(let error):
-                    showAlert(title: "Error de autenticación", message: error.localizedDescription)
-                }
-            }
-        }
-    }
-    
-    private func getBiometricIcon() -> String {
-        switch authManager.getBiometricType() {
-        case .faceID:
-            return "faceid"
-        case .touchID:
-            return "touchid"
-        case .none:
-            return "lock.fill"
-        }
-    }
-    
-    private func getBiometricButtonText() -> String {
-        switch authManager.getBiometricType() {
-        case .faceID:
-            return "Iniciar con Face ID"
-        case .touchID:
-            return "Iniciar con Touch ID"
-        case .none:
-            return "Biometría no disponible"
-        }
-    }
+
     
     private func showAlert(title: String, message: String) {
         alertTitle = title
