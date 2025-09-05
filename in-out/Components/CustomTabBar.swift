@@ -11,7 +11,7 @@ struct CustomTabBar: View {
     @State private var selectedTab = 0
     
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: -30) {
             HStack(spacing: 0) {
                 // Tab 1 - Gestión
                 TabBarItem(
@@ -80,16 +80,6 @@ struct CustomTabBar: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color(.systemBackground).opacity(0.95),
-                    Color(.systemGroupedBackground).opacity(0.9)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
         .shadow(color: .black.opacity(0.1), radius: 12, x: 0, y: -4)
     }
 }
