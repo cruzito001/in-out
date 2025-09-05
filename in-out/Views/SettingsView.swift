@@ -24,19 +24,20 @@ struct SettingsView: View {
     let languages = ["Español", "English"]
     
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    Color(.systemBackground),
-                    Color(.systemGroupedBackground),
-                    Color(.secondarySystemGroupedBackground)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-            
-            ScrollView {
+        NavigationView {
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        Color(.systemBackground),
+                        Color(.systemGroupedBackground),
+                        Color(.secondarySystemGroupedBackground)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                
+                ScrollView {
                 VStack(spacing: 24) {
                     // Header
                     headerSection
@@ -64,6 +65,15 @@ struct SettingsView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 20)
             }
+            
+            // CustomTabBar
+            VStack {
+                Spacer()
+                CustomTabBar()
+                    .padding(.bottom, 34)
+            }
+        }
+        .navigationBarHidden(true)
         }
     }
     
