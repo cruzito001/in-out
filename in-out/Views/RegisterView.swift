@@ -9,6 +9,7 @@ import SwiftUI
 
 struct RegisterView: View {
     @Binding var showingRegister: Bool
+    @Binding var isLoggedIn: Bool
     @State private var fullName = ""
     @State private var email = ""
     @State private var password = ""
@@ -174,7 +175,11 @@ struct RegisterView: View {
     
     private func createAccountAction() {
         print("Crear cuenta - Nombre: \(fullName), Email: \(email)")
-        // TODO: Implementar lógica de registro
+        // Simulación de registro exitoso
+        // En una app real, aquí crearías la cuenta del usuario
+        withAnimation(.easeInOut(duration: 0.5)) {
+            isLoggedIn = true
+        }
     }
     
     private func goToLoginAction() {
@@ -183,5 +188,5 @@ struct RegisterView: View {
 }
 
 #Preview {
-    RegisterView(showingRegister: .constant(true))
+    RegisterView(showingRegister: .constant(true), isLoggedIn: .constant(false))
 }

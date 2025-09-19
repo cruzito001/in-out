@@ -66,12 +66,7 @@ struct SettingsView: View {
                 .padding(.top, 20)
             }
             
-            // CustomTabBar
-            VStack {
-                Spacer()
-                CustomTabBar()
-                    .padding(.bottom, 34)
-            }
+
         }
         .navigationBarHidden(true)
         }

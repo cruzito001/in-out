@@ -9,6 +9,7 @@ import SwiftUI
 
 struct LoginView: View {
     @Binding var showingRegister: Bool
+    @Binding var isLoggedIn: Bool
     @State private var email = ""
     @State private var password = ""
     @State private var isAuthenticating = false
@@ -177,7 +178,11 @@ struct LoginView: View {
     }
     
     private func loginAction() {
-        
+        // Simulación de autenticación exitosa
+        // En una app real, aquí validarías las credenciales
+        withAnimation(.easeInOut(duration: 0.5)) {
+            isLoggedIn = true
+        }
     }
     
     private func forgotPasswordAction() {
@@ -199,5 +204,5 @@ struct LoginView: View {
 }
 
 #Preview {
-    LoginView(showingRegister: .constant(false))
+    LoginView(showingRegister: .constant(false), isLoggedIn: .constant(false))
 }

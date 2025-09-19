@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct CustomTabBar: View {
-    @State private var selectedTab = 0
+    @Binding var selectedTab: Int
     
     var body: some View {
         HStack(spacing: -30) {
@@ -127,19 +127,27 @@ struct TabBarItem: View {
 }
 
 #Preview {
-    VStack {
-        Spacer()
-        CustomTabBar()
+    struct PreviewWrapper: View {
+        @State private var selectedTab = 0
+        
+        var body: some View {
+            VStack {
+                Spacer()
+                CustomTabBar(selectedTab: $selectedTab)
+            }
+            .background(
+                LinearGradient(
+                    colors: [
+                        Color(.systemBackground),
+                        Color(.systemGroupedBackground),
+                        Color(.secondarySystemGroupedBackground)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+        }
     }
-    .background(
-        LinearGradient(
-            colors: [
-                Color(.systemBackground),
-                Color(.systemGroupedBackground),
-                Color(.secondarySystemGroupedBackground)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    )
+    
+    return PreviewWrapper()
 }

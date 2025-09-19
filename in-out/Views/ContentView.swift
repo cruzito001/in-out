@@ -9,12 +9,17 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var showingRegister = false
+    @State private var isLoggedIn = false
     
     var body: some View {
-        if showingRegister {
-            RegisterView(showingRegister: $showingRegister)
+        if isLoggedIn {
+            MainTabView()
         } else {
-            LoginView(showingRegister: $showingRegister)
+            if showingRegister {
+                RegisterView(showingRegister: $showingRegister, isLoggedIn: $isLoggedIn)
+            } else {
+                LoginView(showingRegister: $showingRegister, isLoggedIn: $isLoggedIn)
+            }
         }
     }
 }
