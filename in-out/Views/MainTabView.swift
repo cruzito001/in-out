@@ -13,8 +13,10 @@ struct MainTabView: View {
     var body: some View {
         ZStack {
             switch selectedTab {
-            case 0, 1, 2:
+            case 0, 1:
                 ComingSoonView()
+            case 2:
+                RouletteCardsView()
             case 3:
                 SettingsView()
             default:
