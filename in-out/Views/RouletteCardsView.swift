@@ -56,7 +56,7 @@ struct RouletteCardsView: View {
                 controls
             }
             .padding(.horizontal, 20)
-            .padding(.top, 20)
+            .padding(.top, -180)
             .padding(.bottom, 10)
             
             if showWinnerBanner, let winner = currentWinner {
@@ -84,7 +84,7 @@ struct RouletteCardsView: View {
     
     // MARK: - Empty State
     private var emptyState: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 30) {
             Image(systemName: "person.3.fill")
                 .font(.system(size: 48, weight: .medium))
                 .foregroundStyle(.blue)
@@ -121,7 +121,7 @@ struct RouletteCardsView: View {
             TabView(selection: $selectedIndex) {
                 ForEach(Array(participants.enumerated()), id: \.element.id) { index, participant in
                     ParticipantCard(participant: participant, isFocused: index == selectedIndex)
-                        .padding(.horizontal, 10)
+                        .padding(.horizontal, 0)
                         .tag(index)
                         .contextMenu {
                             Button(role: .destructive) { removeParticipant(at: index) } label: {
@@ -418,12 +418,26 @@ private struct ParticipantCard: View {
                         .font(.system(.title2, design: .default, weight: .medium))
                         .foregroundStyle(.white.opacity(0.9))
                     Spacer()
-                    Circle()
-                        .fill(Color.white.opacity(0.25))
-                        .frame(width: 10, height: 10)
+                    // EMV chip detail
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.yellow.opacity(0.85), Color.orange.opacity(0.7)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 24, height: 18)
                         .overlay(
-                            Circle()
-                                .stroke(Color.white.opacity(0.4), lineWidth: 1)
+                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                .stroke(Color.white.opacity(0.35), lineWidth: 0.8)
+                        )
+                        .overlay(
+                            HStack(spacing: 3) {
+                                Capsule().fill(Color.white.opacity(0.35)).frame(width: 5, height: 1.2)
+                                Capsule().fill(Color.white.opacity(0.35)).frame(width: 5, height: 1.2)
+                                Capsule().fill(Color.white.opacity(0.35)).frame(width: 5, height: 1.2)
+                            }
                         )
                 }
                 
