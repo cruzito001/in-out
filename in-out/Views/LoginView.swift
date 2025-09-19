@@ -139,7 +139,11 @@ struct LoginView: View {
                     .padding(.vertical, 8)
                     
                     // Botón FaceID
-                    Button(action: { BiometricAuthenticationHelper.performBiometricAuthentication(authManager: authManager, isAuthenticating: $isAuthenticating, showAlert: showAlert) }) {
+                    Button(action: { BiometricAuthenticationHelper.performBiometricAuthentication(authManager: authManager, isAuthenticating: $isAuthenticating, onSuccess: {
+                        withAnimation(.easeInOut(duration: 0.5)) {
+                            isLoggedIn = true
+                        }
+                    }, showAlert: showAlert) }) {
                         HStack(spacing: 12) {
                             if isAuthenticating {
                                 ProgressView()

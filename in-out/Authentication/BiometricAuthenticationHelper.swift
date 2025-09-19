@@ -40,6 +40,7 @@ class BiometricAuthenticationHelper {
     static func performBiometricAuthentication(
         authManager: AuthenticationManager,
         isAuthenticating: Binding<Bool>,
+        onSuccess: @escaping () -> Void,
         showAlert: @escaping (String, String) -> Void
     ) {
         guard authManager.isBiometricAuthenticationAvailable() else {
@@ -59,8 +60,7 @@ class BiometricAuthenticationHelper {
                 case .success(let success):
                     if success {
                         // Autenticación exitosa
-                        showAlert("¡Éxito!", "Autenticación biométrica exitosa. Bienvenido a la aplicación.")
-                        // Aquí puedes navegar a la siguiente pantalla o realizar la acción de login
+                        onSuccess()
                     }
                 case .failure(let error):
                     showAlert("Error de autenticación", error.localizedDescription)
