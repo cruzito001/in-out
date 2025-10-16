@@ -9,29 +9,35 @@ import SwiftUI
 
 struct MainTabView: View {
     @State private var selectedTab = 0
-    
+
     var body: some View {
-        ZStack {
-            switch selectedTab {
-            case 0:
-                SpendingDashboardView()
-            case 1:
-                ComingSoonView()
-            case 2:
-                RouletteCardsView()
-            case 3:
-                SettingsView()
-            default:
-                ComingSoonView()
-            }
-            
-            // CustomTabBar en la parte inferior
-            VStack {
-                Spacer()
-                CustomTabBar(selectedTab: $selectedTab)
-                    .padding(.bottom, 34)
-            }
+        TabView(selection: $selectedTab) {
+            SpendingDashboardView()
+                .tabItem {
+                    Label("Gestión", systemImage: "chart.pie.fill")
+                }
+                .tag(0)
+
+            ComingSoonView()
+                .tabItem {
+                    Label("División", systemImage: "divide.circle.fill")
+                }
+                .tag(1)
+
+            RouletteCardsView()
+                .tabItem {
+                    Label("Ruleta", systemImage: "arrow.triangle.2.circlepath")
+                }
+                .tag(2)
+
+            SettingsView()
+                .tabItem {
+                    Label("Config", systemImage: "gearshape.fill")
+                }
+                .tag(3)
         }
+        .toolbarBackground(.ultraThinMaterial, for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
         .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 }
