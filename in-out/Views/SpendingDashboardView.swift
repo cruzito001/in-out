@@ -44,6 +44,7 @@ struct SpendingDashboardView: View {
     @State private var selectedPeriod: Period = .mesActual
     @State private var selectedCategoryName: String = "Todas"
     @Query(sort: \Category.name) private var customCategories: [Category]
+    @Query(sort: \Expense.date, order: .reverse) private var allExpenses: [Expense]
     
     var body: some View {
         ZStack {
@@ -57,15 +58,21 @@ struct SpendingDashboardView: View {
             )
             .ignoresSafeArea()
             
-            VStack(spacing: 14) {
-                header
-                selector
-                filtersBar
-                content
+            ScrollView {
+                VStack(spacing: 14) {
+                    selector
+                    filtersBar
+                    content
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 40)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, -180)
-            .padding(.bottom, 40)
+            .scrollIndicators(.hidden)
+            .safeAreaInset(edge: .top) {
+                header
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 12)
+            }
         }
         .fullScreenCover(isPresented: $showAddSheet) {
             AddExpenseView()
@@ -85,7 +92,7 @@ struct SpendingDashboardView: View {
                     .font(.system(.largeTitle, design: .rounded, weight: .bold))
                     .foregroundStyle(.primary)
                     .shadow(color: .black.opacity(0.08), radius: 2, x: 0, y: 1)
-                Text("Actualizado justo ahora")
+                Text("Actualizado justo ahora • \(allExpenses.count == 1 ? "1 gasto" : "\(allExpenses.count) gastos")")
                     .font(.system(.subheadline, design: .default, weight: .medium))
                     .foregroundStyle(.secondary)
             }
@@ -207,25 +214,137 @@ struct SpendingDashboardView: View {
     // MARK: - Contenido (placeholder por segmento)
     private var content: some View {
         VStack(spacing: 16) {
-            RoundedRectangle(cornerRadius: 20)
-                .fill(.thinMaterial)
-                .frame(height: 220)
-                .overlay(
-                    VStack(spacing: 8) {
-                        Image(systemName: iconForSelected())
-                            .font(.system(size: 28, weight: .medium))
-                            .foregroundStyle(.blue)
-                        Text(titleForSelected())
-                            .font(.system(.title2, design: .rounded, weight: .bold))
-                            .foregroundStyle(.primary)
-                        Text("Aquí agregaremos gráficos y KPIs de \(selected.rawValue)")
-                            .font(.system(.subheadline, design: .default))
-                            .foregroundStyle(.secondary)
-                    }
-                )
-                .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 6)
+            if selected == .resumen {
+                summaryView
+            } else {
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(.thinMaterial)
+                    .frame(height: 220)
+                    .overlay(
+                        VStack(spacing: 8) {
+                            Image(systemName: iconForSelected())
+                                .font(.system(size: 28, weight: .medium))
+                                .foregroundStyle(.blue)
+                            Text(titleForSelected())
+                                .font(.system(.title2, design: .rounded, weight: .bold))
+                                .foregroundStyle(.primary)
+                            Text("Aquí agregaremos gráficos y KPIs de \(selected.rawValue)")
+                                .font(.system(.subheadline, design: .default))
+                                .foregroundStyle(.secondary)
+                        }
+                    )
+                    .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 6)
+            }
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private var summaryView: some View {
+        let expenses = filteredExpenses()
+        return VStack(spacing: 16) {
+            if expenses.isEmpty {
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(.thinMaterial)
+                    .frame(height: 180)
+                    .overlay(
+                        VStack(spacing: 8) {
+                            Image(systemName: "rectangle.grid.2x2.fill")
+                                .font(.system(size: 28, weight: .medium))
+                                .foregroundStyle(.blue)
+                            Text("Resumen del periodo")
+                                .font(.system(.title2, design: .rounded, weight: .bold))
+                            Text("Aún no hay gastos en el periodo seleccionado")
+                                .font(.system(.subheadline))
+                                .foregroundStyle(.secondary)
+                        }
+                    )
+            } else {
+                // Totales por moneda
+                let totals = totalsByCurrency(expenses)
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(.thinMaterial)
+                    .overlay(
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Image(systemName: "rectangle.grid.2x2.fill")
+                                    .foregroundStyle(.blue)
+                                Text("Resumen del periodo")
+                                    .font(.system(.title3, design: .rounded, weight: .bold))
+                            }
+                            VStack(alignment: .leading, spacing: 8) {
+                                ForEach(totals.keys.sorted(), id: \.self) { code in
+                                    HStack {
+                                        Image(systemName: symbolForCurrency(code))
+                                        Text("Total \(code):")
+                                        Spacer()
+                                        Text(formatAmount(totals[code] ?? 0, currencyCode: code))
+                                            .fontWeight(.semibold)
+                                    }
+                                }
+                            }
+                            Divider()
+                            HStack {
+                                Label("Transacciones", systemImage: "list.bullet")
+                                Spacer()
+                                Text("\(expenses.count)")
+                                    .fontWeight(.semibold)
+                            }
+                            if let top = topCategory(expenses) {
+                                HStack {
+                                    Image(systemName: symbolForCategory(top.name))
+                                    Text("Top categoría:")
+                                    Text(top.name)
+                                        .fontWeight(.semibold)
+                                    Spacer()
+                                    Text(formatAmount(top.total, currencyCode: top.currency))
+                                        .fontWeight(.semibold)
+                                }
+                            }
+                        }
+                        .padding(16)
+                    )
+                    .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 6)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 220)
+
+                // Últimos gastos
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(.thinMaterial)
+                    .overlay(
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Image(systemName: "clock")
+                                    .foregroundStyle(.blue)
+                                Text("Últimos gastos")
+                                    .font(.system(.title3, design: .rounded, weight: .bold))
+                            }
+                            VStack(spacing: 10) {
+                                ForEach(Array(expenses.prefix(5)), id: \.id) { e in
+                                    HStack(spacing: 12) {
+                                        Image(systemName: symbolForCategory(e.category))
+                                            .foregroundStyle(.secondary)
+                                            .frame(width: 24)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(e.title ?? e.category)
+                                                .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                                            Text(shortDate(e.date))
+                                                .font(.system(.caption, design: .default))
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        Spacer()
+                                        Text(formatAmount(e.amountInCents, currencyCode: e.currencyCode))
+                                            .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                                    }
+                                }
+                            }
+                        }
+                        .padding(16)
+                    )
+                    .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 6)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 200)
+            }
+        }
     }
     
     private func iconForSelected() -> String {
@@ -253,6 +372,77 @@ struct SpendingDashboardView: View {
 }
 
 private extension SpendingDashboardView {
+    func filteredExpenses() -> [Expense] {
+        let range = dateInterval(for: selectedPeriod)
+        return allExpenses.filter { exp in
+            range.contains(exp.date) &&
+            (selectedCategoryName == "Todas" || exp.category.lowercased() == selectedCategoryName.lowercased())
+        }
+    }
+
+    func dateInterval(for period: Period) -> DateInterval {
+        let cal = Calendar.current
+        let now = Date()
+        switch period {
+        case .mesActual:
+            let start = cal.date(from: cal.dateComponents([.year, .month], from: now))!
+            let end = cal.date(byAdding: .month, value: 1, to: start)!
+            return DateInterval(start: start, end: end)
+        case .mesAnterior:
+            let currentStart = cal.date(from: cal.dateComponents([.year, .month], from: now))!
+            let start = cal.date(byAdding: .month, value: -1, to: currentStart)!
+            return DateInterval(start: start, end: currentStart)
+        case .tresMeses:
+            let currentStart = cal.date(from: cal.dateComponents([.year, .month], from: now))!
+            let start = cal.date(byAdding: .month, value: -2, to: currentStart)!
+            let end = cal.date(byAdding: .month, value: 1, to: currentStart)!
+            return DateInterval(start: start, end: end)
+        case .anio:
+            let comps = cal.dateComponents([.year], from: now)
+            let start = cal.date(from: comps)!
+            let end = cal.date(byAdding: .year, value: 1, to: start)!
+            return DateInterval(start: start, end: end)
+        case .personalizado:
+            // Por ahora usamos mes actual; luego agregamos selector de rango
+            let start = cal.date(from: cal.dateComponents([.year, .month], from: now))!
+            let end = cal.date(byAdding: .month, value: 1, to: start)!
+            return DateInterval(start: start, end: end)
+        }
+    }
+
+    func totalsByCurrency(_ expenses: [Expense]) -> [String: Int] {
+        var totals: [String: Int] = [:]
+        for e in expenses { totals[e.currencyCode, default: 0] += e.amountInCents }
+        return totals
+    }
+
+    func topCategory(_ expenses: [Expense]) -> (name: String, total: Int, currency: String)? {
+        // Nota: mezcla monedas; tomamos la moneda más frecuente para mostrar
+        var sums: [String: (total: Int, currency: String, count: Int)] = [:]
+        for e in expenses { sums[e.category, default: (0, e.currencyCode, 0)].total += e.amountInCents; sums[e.category, default: (0, e.currencyCode, 0)].count += 1 }
+        let sorted = sums.sorted { $0.value.total > $1.value.total }
+        guard let first = sorted.first else { return nil }
+        return (name: first.key, total: first.value.total, currency: first.value.currency)
+    }
+
+    func formatAmount(_ cents: Int, currencyCode: String) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = currencyCode
+        formatter.maximumFractionDigits = 2
+        formatter.minimumFractionDigits = 2
+        let value = Double(cents) / 100.0
+        return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
+    }
+
+    func symbolForCurrency(_ code: String) -> String {
+        switch code.uppercased() {
+        case "MXN": return "pesosign.circle"
+        case "USD": return "dollarsign.circle"
+        case "EUR": return "eurosign.circle"
+        default: return "banknote"
+        }
+    }
     var combinedCategories: [CategoryItem] {
         var base = PredefinedCategories.all
         let customs = customCategories.map { CategoryItem(id: $0.id.uuidString, name: $0.name, symbol: $0.symbol) }
@@ -274,5 +464,12 @@ private extension SpendingDashboardView {
             return custom.symbol
         }
         return "tag.fill"
+    }
+
+    func shortDate(_ date: Date) -> String {
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "es_MX")
+        df.setLocalizedDateFormatFromTemplate("d MMM yyyy, HH:mm")
+        return df.string(from: date)
     }
 }

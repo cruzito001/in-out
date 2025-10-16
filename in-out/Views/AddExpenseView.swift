@@ -134,7 +134,6 @@ struct AddExpenseView: View {
         guard let cents = parseAmountToCents(amountText) else { return false }
         return cents > 0
             && !category.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private func save() {
@@ -152,6 +151,13 @@ struct AddExpenseView: View {
             currencyCode: currency.rawValue
         )
         context.insert(expense)
+        do {
+            try context.save()
+        } catch {
+            errorMessage = "No se pudo guardar el gasto: \(error.localizedDescription)"
+            showingError = true
+            return
+        }
         dismiss()
     }
 

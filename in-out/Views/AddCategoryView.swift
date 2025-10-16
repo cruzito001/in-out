@@ -8,6 +8,8 @@ struct AddCategoryView: View {
     @State private var name: String = ""
     @State private var symbol: String = "tag.fill"
     @FocusState private var nameFocused: Bool
+    @State private var showingError: Bool = false
+    @State private var errorMessage: String = ""
 
     @Query(sort: \Category.name) private var existingCategories: [Category]
 
@@ -30,6 +32,18 @@ struct AddCategoryView: View {
         return !existsInPredef && !existsCustom
     }
 
+    private var duplicateReason: String? {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if PredefinedCategories.all.map({ $0.name.lowercased() }).contains(trimmed.lowercased()) {
+            return "Ese nombre ya existe en las categorías predefinidas"
+        }
+        if existingCategories.map({ $0.name.lowercased() }).contains(trimmed.lowercased()) {
+            return "Ese nombre ya existe en tus categorías"
+        }
+        return nil
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -44,6 +58,11 @@ struct AddCategoryView: View {
                             .focused($nameFocused)
                             .padding()
                             .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                        if let reason = duplicateReason {
+                            Text(reason)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
@@ -83,7 +102,13 @@ struct AddCategoryView: View {
                         guard !trimmed.isEmpty else { return }
                         let new = Category(name: trimmed, symbol: symbol)
                         modelContext.insert(new)
-                        try? modelContext.save()
+                        do {
+                            try modelContext.save()
+                        } catch {
+                            errorMessage = "No se pudo guardar la categoría: \(error.localizedDescription)"
+                            showingError = true
+                            return
+                        }
                         dismiss()
                     }
                     .disabled(!canSave)
@@ -91,6 +116,11 @@ struct AddCategoryView: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .onAppear { nameFocused = true }
+            .alert("Error", isPresented: $showingError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(errorMessage)
+            }
         }
     }
 }
