@@ -13,7 +13,9 @@ struct MainTabView: View {
     var body: some View {
         ZStack {
             switch selectedTab {
-            case 0, 1:
+            case 0:
+                SpendingDashboardView()
+            case 1:
                 ComingSoonView()
             case 2:
                 RouletteCardsView()
