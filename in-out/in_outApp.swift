@@ -7,6 +7,7 @@
 
 import SwiftUI
 import UIKit
+import SwiftData
 
 @main
 struct in_outApp: App {
@@ -23,6 +24,7 @@ struct in_outApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+            .modelContainer(for: [Expense.self, Category.self])
         }
     }
 }

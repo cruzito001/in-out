@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SwiftData
 
 struct SpendingDashboardView: View {
     // MARK: - Selector (tipo Mail)
@@ -37,18 +38,12 @@ struct SpendingDashboardView: View {
         var id: String { rawValue }
     }
     
-    enum CategoryFilter: String, CaseIterable, Identifiable {
-        case todas = "Todas"
-        case comida = "Comida"
-        case transporte = "Transporte"
-        case servicios = "Servicios"
-        var id: String { rawValue }
-    }
-    
     @State private var selected: Segment = .resumen
     @State private var showAddSheet: Bool = false
+    @State private var showAddCategorySheet: Bool = false
     @State private var selectedPeriod: Period = .mesActual
-    @State private var selectedCategory: CategoryFilter = .todas
+    @State private var selectedCategoryName: String = "Todas"
+    @Query(sort: \Category.name) private var customCategories: [Category]
     
     var body: some View {
         ZStack {
@@ -67,41 +62,49 @@ struct SpendingDashboardView: View {
                 selector
                 filtersBar
                 content
-                addButton
             }
             .padding(.horizontal, 20)
             .padding(.top, -180)
             .padding(.bottom, 40)
         }
-        .sheet(isPresented: $showAddSheet) {
-            NavigationView {
-                Form {
-                    Section("Nuevo gasto") {
-                        Text("Aquí iría el formulario")
-                    }
-                }
-                .navigationTitle("Añadir gasto")
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cerrar") { showAddSheet = false }
-                    }
-                }
-            }
+        .fullScreenCover(isPresented: $showAddSheet) {
+            AddExpenseView()
+                .presentationBackground(.thinMaterial)
+        }
+        .fullScreenCover(isPresented: $showAddCategorySheet) {
+            AddCategoryView()
+                .presentationBackground(.thinMaterial)
         }
     }
     
     // MARK: - Header
     private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Control de gastos")
-                .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                .foregroundStyle(.primary)
-                .shadow(color: .black.opacity(0.08), radius: 2, x: 0, y: 1)
-            Text("Actualizado justo ahora")
-                .font(.system(.subheadline, design: .default, weight: .medium))
-                .foregroundStyle(.secondary)
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Control de gastos")
+                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    .foregroundStyle(.primary)
+                    .shadow(color: .black.opacity(0.08), radius: 2, x: 0, y: 1)
+                Text("Actualizado justo ahora")
+                    .font(.system(.subheadline, design: .default, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Menu {
+                Button(action: { showAddSheet = true }) {
+                    Label("Agregar gasto", systemImage: "plus.circle")
+                }
+                Button(action: { showAddCategorySheet = true }) {
+                    Label("Agregar categoría", systemImage: "folder.badge.plus")
+                }
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .padding(10)
+                    .background(.thinMaterial, in: Circle())
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
     
     // MARK: - Selector estilo Mail
@@ -170,18 +173,26 @@ struct SpendingDashboardView: View {
             }
             
             Menu {
-                ForEach(CategoryFilter.allCases) { c in
-                    Button(action: { selectedCategory = c }) {
+                Button(action: { selectedCategoryName = "Todas" }) {
+                    HStack {
+                        Image(systemName: "slider.horizontal.3")
+                        Text("Todas")
+                        if selectedCategoryName == "Todas" { Spacer(); Image(systemName: "checkmark") }
+                    }
+                }
+                ForEach(combinedCategories, id: \.name) { item in
+                    Button(action: { selectedCategoryName = item.name }) {
                         HStack {
-                            Text(c.rawValue)
-                            if selectedCategory == c { Spacer(); Image(systemName: "checkmark") }
+                            Image(systemName: item.symbol)
+                            Text(item.name)
+                            if selectedCategoryName == item.name { Spacer(); Image(systemName: "checkmark") }
                         }
                     }
                 }
             } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: "slider.horizontal.3")
-                    Text("Categorías: \(selectedCategory.rawValue)")
+                    Image(systemName: (selectedCategoryName == "Todas" ? "slider.horizontal.3" : symbolForCategory(selectedCategoryName)))
+                    Text("Categorías: \(selectedCategoryName)")
                 }
                 .font(.system(.subheadline, design: .rounded, weight: .semibold))
                 .foregroundStyle(.primary)
@@ -235,23 +246,33 @@ struct SpendingDashboardView: View {
         }
     }
     
-    // MARK: - CTA Añadir gasto
-    private var addButton: some View {
-        Button(action: { showAddSheet = true }) {
-            Text("Añadir gasto")
-                .font(.system(.headline, design: .rounded, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 18)
-        }
-        .background(
-            LinearGradient(colors: [Color.blue, Color.blue.opacity(0.85)], startPoint: .topLeading, endPoint: .bottomTrailing),
-            in: RoundedRectangle(cornerRadius: 16)
-        )
-        .shadow(color: .blue.opacity(0.3), radius: 12, x: 0, y: 6)
-    }
 }
 
 #Preview {
     SpendingDashboardView()
+}
+
+private extension SpendingDashboardView {
+    var combinedCategories: [CategoryItem] {
+        var base = PredefinedCategories.all
+        let customs = customCategories.map { CategoryItem(id: $0.id.uuidString, name: $0.name, symbol: $0.symbol) }
+        let all = base + customs
+        var seen = Set<String>()
+        return all.filter { item in
+            let key = item.name.lowercased()
+            if seen.contains(key) { return false }
+            seen.insert(key)
+            return true
+        }
+    }
+
+    func symbolForCategory(_ name: String) -> String {
+        if let item = PredefinedCategories.all.first(where: { $0.name.lowercased() == name.lowercased() }) {
+            return item.symbol
+        }
+        if let custom = customCategories.first(where: { $0.name.lowercased() == name.lowercased() }) {
+            return custom.symbol
+        }
+        return "tag.fill"
+    }
 }
