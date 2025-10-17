@@ -26,6 +26,8 @@ struct RouletteCardsView: View {
     @State private var avoidImmediateRepeat: Bool = true
     @State private var showWinnerBanner: Bool = false
     @State private var winnerPulse: Bool = false
+    @State private var showValidationError: Bool = false
+    @State private var validationErrorMessage: String = ""
     
     // MARK: - Constants
     private let palette: [Color] = [.blue, .indigo, .purple, .pink, .teal, .green, .orange]
@@ -43,22 +45,26 @@ struct RouletteCardsView: View {
                 endPoint: .bottomTrailing
             )
             .ignoresSafeArea()
-            
-            VStack(spacing: 20) {
-                header
-                
-                if participants.isEmpty {
-                    emptyState
-                } else {
-                    carousel
+
+            ScrollView {
+                VStack(spacing: 20) {
+                    if participants.isEmpty {
+                        emptyState
+                    } else {
+                        carousel
+                    }
+                    controls
                 }
-                
-                controls
+                .padding(.horizontal, 20)
+                .padding(.bottom, 40)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, -180)
-            .padding(.bottom, 10)
-            
+            .scrollIndicators(.hidden)
+            .safeAreaInset(edge: .top) {
+                header
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 12)
+            }
+
             if showWinnerBanner, let winner = currentWinner {
                 winnerBanner(winner)
                     .transition(.scale.combined(with: .opacity))
@@ -67,18 +73,59 @@ struct RouletteCardsView: View {
         .sheet(isPresented: $showAddSheet) {
             addParticipantSheet
         }
+        .alert("Error", isPresented: $showValidationError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(validationErrorMessage)
+        }
     }
     
     // MARK: - Header
     private var header: some View {
-        VStack(spacing: 8) {
-            Text("¿Quién paga?")
-                .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                .foregroundStyle(.primary)
-                .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
-            Text("Agrega participantes y sortea")
-                .font(.system(.subheadline, design: .default, weight: .medium))
-                .foregroundStyle(.secondary)
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("¿Quién paga?")
+                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    .foregroundStyle(.primary)
+                    .shadow(color: .black.opacity(0.08), radius: 2, x: 0, y: 1)
+                Text(participants.count == 1 ? "1 participante" : "\(participants.count) participantes")
+                    .font(.system(.subheadline, design: .default, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            HStack(spacing: 10) {
+                // Añadir / Limpiar lista
+                Menu {
+                    Button(action: { showAddSheet = true }) {
+                        Label("Añadir participante", systemImage: "plus.circle")
+                    }
+                    if !participants.isEmpty {
+                        Button(role: .destructive, action: clearParticipants) {
+                            Label("Limpiar lista", systemImage: "trash")
+                        }
+                    }
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .padding(10)
+                        .background(.thinMaterial, in: Circle())
+                }
+
+                // Opciones
+                Menu {
+                    Toggle("Evitar repetición inmediata", isOn: $avoidImmediateRepeat)
+                    if lastWinnerIndex != nil {
+                        Button("Limpiar sorteo", action: clearWinner)
+                    }
+                } label: {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .padding(10)
+                        .background(.thinMaterial, in: Circle())
+                }
+            }
         }
     }
     
@@ -92,22 +139,10 @@ struct RouletteCardsView: View {
             Text("Aún no hay participantes")
                 .font(.system(.title2, design: .rounded, weight: .semibold))
                 .foregroundStyle(.primary)
-            Text("Añade al menos dos personas para empezar el sorteo")
+            Text("Añade al menos dos participantes para empezar el sorteo")
                 .font(.system(.body, design: .default))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            Button(action: { showAddSheet = true }) {
-                Text("Añadir participante")
-                    .font(.system(.headline, design: .rounded, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-            }
-            .background(
-                LinearGradient(colors: [Color.blue, Color.blue.opacity(0.8)], startPoint: .topLeading, endPoint: .bottomTrailing),
-                in: RoundedRectangle(cornerRadius: 16)
-            )
-            .shadow(color: .blue.opacity(0.3), radius: 12, x: 0, y: 6)
         }
         .padding(24)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 20))
@@ -176,42 +211,6 @@ struct RouletteCardsView: View {
             )
             .shadow(color: .blue.opacity(0.3), radius: 12, x: 0, y: 6)
             .disabled(participants.count < 2 || isSpinning)
-            
-            HStack(spacing: 12) {
-                Button(action: { showAddSheet = true }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "plus.circle.fill")
-                        Text("Añadir participante")
-                    }
-                    .font(.system(.subheadline, design: .rounded, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                }
-                .background(
-                    .thinMaterial,
-                    in: RoundedRectangle(cornerRadius: 14)
-                )
-                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
-                
-                Menu {
-                    Toggle("Evitar repetición inmediata", isOn: $avoidImmediateRepeat)
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "slider.horizontal.3")
-                        Text("Opciones")
-                    }
-                    .font(.system(.subheadline, design: .rounded, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .frame(maxWidth: 160)
-                    .padding(.vertical, 14)
-                }
-                .background(
-                    .thinMaterial,
-                    in: RoundedRectangle(cornerRadius: 14)
-                )
-                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
-            }
         }
     }
     
@@ -304,6 +303,12 @@ struct RouletteCardsView: View {
     private func addParticipant() {
         let name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return }
+        // Validación: evitar nombres duplicados (ignorando mayúsculas/minúsculas)
+        if participants.contains(where: { $0.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == name.lowercased() }) {
+            validationErrorMessage = "Ya existe un participante con ese nombre"
+            showValidationError = true
+            return
+        }
         let p = Participant(name: name, color: newColor)
         participants.append(p)
         newName = ""
@@ -356,7 +361,7 @@ struct RouletteCardsView: View {
                 selectedIndex = (selectedIndex + 1) % participants.count
             }
             step += 1
-            delay = min(delay * 1.08, 0.18) // desacelera ligeramente
+            delay = min(delay * 1.08, 0.18)
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                 performStep()
             }
@@ -381,6 +386,18 @@ struct RouletteCardsView: View {
             }
             isSpinning = false
         }
+    }
+
+    private func clearParticipants() {
+        participants.removeAll()
+        selectedIndex = 0
+        lastWinnerIndex = nil
+        showWinnerBanner = false
+    }
+
+    private func clearWinner() {
+        lastWinnerIndex = nil
+        showWinnerBanner = false
     }
 }
 
