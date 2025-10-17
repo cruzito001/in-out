@@ -45,6 +45,9 @@ struct SpendingDashboardView: View {
     @State private var selectedCategoryName: String = "Todas"
     @Query(sort: \Category.name) private var customCategories: [Category]
     @Query(sort: \Expense.date, order: .reverse) private var allExpenses: [Expense]
+    @Environment(\.modelContext) private var modelContext
+    @State private var showDeleteError: Bool = false
+    @State private var deleteErrorMessage: String = ""
     
     var body: some View {
         ZStack {
@@ -73,6 +76,11 @@ struct SpendingDashboardView: View {
                     .padding(.horizontal, 20)
                     .padding(.bottom, 12)
             }
+        }
+        .alert("Error", isPresented: $showDeleteError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(deleteErrorMessage)
         }
         .fullScreenCover(isPresented: $showAddSheet) {
             AddExpenseView()
@@ -209,13 +217,17 @@ struct SpendingDashboardView: View {
             }
             Spacer()
         }
+        .padding(.bottom, 16)
     }
     
-    // MARK: - Contenido (placeholder por segmento)
+    // MARK: - Contenido (por segmento)
     private var content: some View {
         VStack(spacing: 16) {
             if selected == .resumen {
                 summaryView
+            } else if selected == .transacciones {
+                transactionsView
+                    .padding(.top, 20)
             } else {
                 RoundedRectangle(cornerRadius: 20)
                     .fill(.thinMaterial)
@@ -362,6 +374,98 @@ struct SpendingDashboardView: View {
         case .transacciones: return "Transacciones"
         case .distribucion: return "Distribución por categoría"
         case .tendencia: return "Tendencia"
+        }
+    }
+
+    // MARK: - Transacciones
+    private var transactionsView: some View {
+        let expenses = filteredExpenses()
+        return VStack(spacing: 16) {
+            if expenses.isEmpty {
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(.thinMaterial)
+                    .overlay(
+                        VStack(spacing: 8) {
+                            Image(systemName: "list.bullet")
+                                .font(.system(size: 28, weight: .medium))
+                                .foregroundStyle(.blue)
+                            Text("Transacciones")
+                                .font(.system(.title2, design: .rounded, weight: .bold))
+                            Text("Aún no hay gastos en el periodo seleccionado")
+                                .font(.system(.subheadline))
+                                .foregroundStyle(.secondary)
+                        }
+                    )
+                    .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 6)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 180)
+                } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Image(systemName: "list.bullet")
+                            .foregroundStyle(.blue)
+                        Text("Transacciones")
+                            .font(.system(.title3, design: .rounded, weight: .bold))
+                        Spacer()
+                        Text("\(expenses.count)")
+                            .font(.system(.caption, design: .rounded, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(.ultraThinMaterial, in: Capsule())
+                    }
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(.thinMaterial)
+                        .frame(height: 220)
+                        .overlay(
+                            ScrollView {
+                                LazyVStack(spacing: 10) {
+                                    ForEach(expenses, id: \.id) { e in
+                                        HStack(spacing: 12) {
+                                            Image(systemName: symbolForCategory(e.category))
+                                                .foregroundStyle(.secondary)
+                                                .frame(width: 24)
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(e.title ?? e.category)
+                                                    .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                                                    .lineLimit(1)
+                                                Text(shortDate(e.date))
+                                                    .font(.system(.caption, design: .default))
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                            Spacer()
+                                            Text(formatAmount(e.amountInCents, currencyCode: e.currencyCode))
+                                                .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                                                .monospacedDigit()
+                                        }
+                                        .padding(.vertical, 8)
+                                        .contextMenu {
+                                            Button(role: .destructive) { deleteExpense(e) } label: {
+                                                Label("Eliminar", systemImage: "trash")
+                                            }
+                                        }
+                                    }
+                                }
+                                .padding(16)
+                            }
+                            .scrollIndicators(.hidden)
+                        )
+                        .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 6)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+        }
+    }
+    
+    private func deleteExpense(_ expense: Expense) {
+        modelContext.delete(expense)
+        do {
+            try modelContext.save()
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        } catch {
+            deleteErrorMessage = "No se pudo eliminar el gasto"
+            showDeleteError = true
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
         }
     }
     
