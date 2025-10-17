@@ -48,6 +48,9 @@ struct SpendingDashboardView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var showDeleteError: Bool = false
     @State private var deleteErrorMessage: String = ""
+    @State private var expenseToEdit: Expense?
+    @State private var showDeleteConfirm: Bool = false
+    @State private var expensePendingDelete: Expense?
     
     var body: some View {
         ZStack {
@@ -61,21 +64,12 @@ struct SpendingDashboardView: View {
             )
             .ignoresSafeArea()
             
-            ScrollView {
-                VStack(spacing: 14) {
-                    selector
-                    filtersBar
-                    content
+            transactionsList
+                .safeAreaInset(edge: .top) {
+                    header
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 12)
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 40)
-            }
-            .scrollIndicators(.hidden)
-            .safeAreaInset(edge: .top) {
-                header
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 12)
-            }
         }
         .alert("Error", isPresented: $showDeleteError) {
             Button("OK", role: .cancel) {}
@@ -89,6 +83,27 @@ struct SpendingDashboardView: View {
         .fullScreenCover(isPresented: $showAddCategorySheet) {
             AddCategoryView()
                 .presentationBackground(.thinMaterial)
+        }
+        .fullScreenCover(item: $expenseToEdit) { expense in
+            EditExpenseView(expense: expense)
+                .presentationBackground(.thinMaterial)
+        }
+        .confirmationDialog("¿Eliminar gasto?", isPresented: $showDeleteConfirm) {
+            Button("Eliminar", role: .destructive) {
+                if let e = expensePendingDelete {
+                    deleteExpense(e)
+                    expensePendingDelete = nil
+                }
+            }
+            Button("Cancelar", role: .cancel) {
+                expensePendingDelete = nil
+            }
+        } message: {
+            if let e = expensePendingDelete {
+                Text("¿Quieres eliminar “\(e.title ?? e.category)”?")
+            } else {
+                Text("Eliminar gasto")
+            }
         }
     }
     
@@ -226,7 +241,7 @@ struct SpendingDashboardView: View {
             if selected == .resumen {
                 summaryView
             } else if selected == .transacciones {
-                transactionsView
+                transactionsList
                     .padding(.top, 20)
             } else {
                 RoundedRectangle(cornerRadius: 20)
@@ -273,88 +288,86 @@ struct SpendingDashboardView: View {
             } else {
                 // Totales por moneda
                 let totals = totalsByCurrency(expenses)
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(.thinMaterial)
-                    .overlay(
-                        VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Image(systemName: "rectangle.grid.2x2.fill")
+                            .foregroundStyle(.blue)
+                        Text("Resumen del periodo")
+                            .font(.system(.title3, design: .rounded, weight: .bold))
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(totals.keys.sorted(), id: \.self) { code in
                             HStack {
-                                Image(systemName: "rectangle.grid.2x2.fill")
-                                    .foregroundStyle(.blue)
-                                Text("Resumen del periodo")
-                                    .font(.system(.title3, design: .rounded, weight: .bold))
-                            }
-                            VStack(alignment: .leading, spacing: 8) {
-                                ForEach(totals.keys.sorted(), id: \.self) { code in
-                                    HStack {
-                                        Image(systemName: symbolForCurrency(code))
-                                        Text("Total \(code):")
-                                        Spacer()
-                                        Text(formatAmount(totals[code] ?? 0, currencyCode: code))
-                                            .fontWeight(.semibold)
-                                    }
-                                }
-                            }
-                            Divider()
-                            HStack {
-                                Label("Transacciones", systemImage: "list.bullet")
+                                Image(systemName: symbolForCurrency(code))
+                                Text("Total \(code):")
                                 Spacer()
-                                Text("\(expenses.count)")
+                                Text(formatAmount(totals[code] ?? 0, currencyCode: code))
                                     .fontWeight(.semibold)
                             }
-                            if let top = topCategory(expenses) {
-                                HStack {
-                                    Image(systemName: symbolForCategory(top.name))
-                                    Text("Top categoría:")
-                                    Text(top.name)
-                                        .fontWeight(.semibold)
-                                    Spacer()
-                                    Text(formatAmount(top.total, currencyCode: top.currency))
-                                        .fontWeight(.semibold)
-                                }
-                            }
                         }
-                        .padding(16)
-                    )
-                    .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 6)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 220)
+                    }
+                    Divider()
+                    HStack {
+                        Label("Transacciones", systemImage: "list.bullet")
+                        Spacer()
+                        Text("\(expenses.count)")
+                            .fontWeight(.semibold)
+                    }
+                    if let top = topCategory(expenses) {
+                        HStack {
+                            Image(systemName: symbolForCategory(top.name))
+                            Text("Top categoría:")
+                            Text(top.name)
+                                .fontWeight(.semibold)
+                            Spacer()
+                            Text(formatAmount(top.total, currencyCode: top.currency))
+                                .fontWeight(.semibold)
+                        }
+                    }
+                }
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(.thinMaterial)
+                )
+                .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 6)
+                .frame(maxWidth: .infinity)
 
                 // Últimos gastos
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(.thinMaterial)
-                    .overlay(
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Image(systemName: "clock")
-                                    .foregroundStyle(.blue)
-                                Text("Últimos gastos")
-                                    .font(.system(.title3, design: .rounded, weight: .bold))
-                            }
-                            VStack(spacing: 10) {
-                                ForEach(Array(expenses.prefix(5)), id: \.id) { e in
-                                    HStack(spacing: 12) {
-                                        Image(systemName: symbolForCategory(e.category))
-                                            .foregroundStyle(.secondary)
-                                            .frame(width: 24)
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(e.title ?? e.category)
-                                                .font(.system(.subheadline, design: .rounded, weight: .semibold))
-                                            Text(shortDate(e.date))
-                                                .font(.system(.caption, design: .default))
-                                                .foregroundStyle(.secondary)
-                                        }
-                                        Spacer()
-                                        Text(formatAmount(e.amountInCents, currencyCode: e.currencyCode))
-                                            .font(.system(.subheadline, design: .rounded, weight: .semibold))
-                                    }
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Image(systemName: "clock")
+                            .foregroundStyle(.blue)
+                        Text("Últimos gastos")
+                            .font(.system(.title3, design: .rounded, weight: .bold))
+                    }
+                    VStack(spacing: 10) {
+                        ForEach(Array(expenses.prefix(5)), id: \.id) { e in
+                            HStack(spacing: 12) {
+                                Image(systemName: symbolForCategory(e.category))
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 24)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(e.title ?? e.category)
+                                        .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                                    Text(shortDate(e.date))
+                                        .font(.system(.caption, design: .default))
+                                        .foregroundStyle(.secondary)
                                 }
+                                Spacer()
+                                Text(formatAmount(e.amountInCents, currencyCode: e.currencyCode))
+                                    .font(.system(.subheadline, design: .rounded, weight: .semibold))
                             }
                         }
-                        .padding(16)
-                    )
-                    .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 6)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 200)
+                    }
+                }
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(.thinMaterial)
+                )
+                .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 6)
+                .frame(maxWidth: .infinity)
             }
         }
     }
@@ -378,29 +391,28 @@ struct SpendingDashboardView: View {
     }
 
     // MARK: - Transacciones
-    private var transactionsView: some View {
+    private var transactionsList: some View {
         let expenses = filteredExpenses()
-        return VStack(spacing: 16) {
-            if expenses.isEmpty {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(.thinMaterial)
-                    .overlay(
-                        VStack(spacing: 8) {
-                            Image(systemName: "list.bullet")
-                                .font(.system(size: 28, weight: .medium))
-                                .foregroundStyle(.blue)
-                            Text("Transacciones")
-                                .font(.system(.title2, design: .rounded, weight: .bold))
-                            Text("Aún no hay gastos en el periodo seleccionado")
-                                .font(.system(.subheadline))
-                                .foregroundStyle(.secondary)
-                        }
-                    )
-                    .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 6)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 180)
-                } else {
-                VStack(alignment: .leading, spacing: 8) {
+        return List {
+            // Selector y filtros como primera sección
+            Section {
+                selector
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(.init(top: 0, leading: 0, bottom: 0, trailing: 0))
+                    .listRowBackground(Color.clear)
+                    .padding(.bottom, 10)
+                filtersBar
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(.init(top: 0, leading: 0, bottom: 0, trailing: 0))
+                    .listRowBackground(Color.clear)
+                    .padding(.top, 6)
+                    .padding(.bottom, 12)
+            }
+            
+            // Sección de contenido según segmento
+            if selected == .transacciones {
+                Section {
+                    // Fila de encabezado "Transacciones" para igualar el estilo de Resumen
                     HStack {
                         Image(systemName: "list.bullet")
                             .foregroundStyle(.blue)
@@ -414,47 +426,109 @@ struct SpendingDashboardView: View {
                             .padding(.vertical, 4)
                             .background(.ultraThinMaterial, in: Capsule())
                     }
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(.init(top: 0, leading: 0, bottom: 0, trailing: 0))
+                    .padding(.bottom, 8)
+                    
+                    if expenses.isEmpty {
+                        VStack(spacing: 8) {
+                            Image(systemName: "list.bullet")
+                                .font(.system(size: 28, weight: .medium))
+                                .foregroundStyle(.blue)
+                            Text("Aún no hay gastos en el periodo seleccionado")
+                                .font(.system(.subheadline))
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 32)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(.init(top: 0, leading: 0, bottom: 0, trailing: 0))
+                    } else {
+                        ForEach(expenses, id: \.id) { e in
+                            HStack(spacing: 12) {
+                                Image(systemName: symbolForCategory(e.category))
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 24)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(e.title ?? e.category)
+                                        .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                                        .lineLimit(1)
+                                    Text(shortDate(e.date))
+                                        .font(.system(.caption, design: .default))
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Text(formatAmount(e.amountInCents, currencyCode: e.currencyCode))
+                                    .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                                    .monospacedDigit()
+                            }
+                            .padding(12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .fill(.ultraThinMaterial)
+                            )
+                            .contentShape(RoundedRectangle(cornerRadius: 14))
+                            .shadow(color: .black.opacity(0.05), radius: 3, x: 0, y: 2)
+                            .padding(.vertical, 6)
+                            .contextMenu {
+                                Button(role: .destructive) { askDelete(e) } label: {
+                                    Label("Eliminar", systemImage: "trash")
+                                }
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) { askDelete(e) } label: {
+                                    Image(systemName: "trash")
+                                }
+                                Button { startEditing(e) } label: {
+                                    Image(systemName: "pencil")
+                                }
+                                .tint(.blue)
+                            }
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(.init(top: 0, leading: 0, bottom: 0, trailing: 0))
+                            .listRowBackground(Color.clear)
+                        }
+                    }
+                }
+            } else if selected == .resumen {
+                Section {
+                    summaryView
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(.init(top: 0, leading: 0, bottom: 0, trailing: 0))
+                        .listRowBackground(Color.clear)
+                }
+            } else {
+                Section {
                     RoundedRectangle(cornerRadius: 20)
                         .fill(.thinMaterial)
                         .frame(height: 220)
                         .overlay(
-                            ScrollView {
-                                LazyVStack(spacing: 10) {
-                                    ForEach(expenses, id: \.id) { e in
-                                        HStack(spacing: 12) {
-                                            Image(systemName: symbolForCategory(e.category))
-                                                .foregroundStyle(.secondary)
-                                                .frame(width: 24)
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text(e.title ?? e.category)
-                                                    .font(.system(.subheadline, design: .rounded, weight: .semibold))
-                                                    .lineLimit(1)
-                                                Text(shortDate(e.date))
-                                                    .font(.system(.caption, design: .default))
-                                                    .foregroundStyle(.secondary)
-                                            }
-                                            Spacer()
-                                            Text(formatAmount(e.amountInCents, currencyCode: e.currencyCode))
-                                                .font(.system(.subheadline, design: .rounded, weight: .semibold))
-                                                .monospacedDigit()
-                                        }
-                                        .padding(.vertical, 8)
-                                        .contextMenu {
-                                            Button(role: .destructive) { deleteExpense(e) } label: {
-                                                Label("Eliminar", systemImage: "trash")
-                                            }
-                                        }
-                                    }
-                                }
-                                .padding(16)
+                            VStack(spacing: 8) {
+                                Image(systemName: iconForSelected())
+                                    .font(.system(size: 28, weight: .medium))
+                                    .foregroundStyle(.blue)
+                                Text(titleForSelected())
+                                    .font(.system(.title2, design: .rounded, weight: .bold))
+                                    .foregroundStyle(.primary)
+                                Text("Aquí agregaremos gráficos y KPIs de \(selected.rawValue)")
+                                    .font(.system(.subheadline, design: .default))
+                                    .foregroundStyle(.secondary)
                             }
-                            .scrollIndicators(.hidden)
                         )
                         .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 6)
                         .frame(maxWidth: .infinity)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(.init(top: 0, leading: 0, bottom: 0, trailing: 0))
+                        .listRowBackground(Color.clear)
                 }
             }
         }
+        .listStyle(.plain)
+        .scrollIndicators(.hidden)
+        .scrollContentBackground(.hidden)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 40)
+        .animation(.easeInOut(duration: 0.25), value: selected)
     }
     
     private func deleteExpense(_ expense: Expense) {
@@ -467,6 +541,15 @@ struct SpendingDashboardView: View {
             showDeleteError = true
             UINotificationFeedbackGenerator().notificationOccurred(.error)
         }
+    }
+    
+    private func askDelete(_ expense: Expense) {
+        expensePendingDelete = expense
+        showDeleteConfirm = true
+    }
+    
+    private func startEditing(_ expense: Expense) {
+        expenseToEdit = expense
     }
     
 }
