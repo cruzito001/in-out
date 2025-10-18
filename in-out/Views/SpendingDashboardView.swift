@@ -88,7 +88,7 @@ struct SpendingDashboardView: View {
             EditExpenseView(expense: expense)
                 .presentationBackground(.thinMaterial)
         }
-        .confirmationDialog("¿Eliminar gasto?", isPresented: $showDeleteConfirm) {
+        .alert("¿Eliminar gasto?", isPresented: $showDeleteConfirm) {
             Button("Eliminar", role: .destructive) {
                 if let e = expensePendingDelete {
                     deleteExpense(e)
