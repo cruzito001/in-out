@@ -52,14 +52,9 @@ struct SplitView: View {
                         // Aseguramos fondo transparente para que se vea el gradiente
                         .scrollContentBackground(.hidden)
                     
-                case .saved:
-                    ScrollView {
-                        placeholderView(title: "Guardados", icon: "bookmark.fill", description: "Historial de divisiones guardadas.")
-                            .padding(.horizontal, 20)
-                            .padding(.bottom, 40)
-                            .padding(.top, 10)
-                    }
-                    .scrollIndicators(.hidden)
+                    case .saved:
+                        ArchivedGroupsView()
+                            .scrollContentBackground(.hidden)
                 }
             }
         }

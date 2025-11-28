@@ -9,7 +9,7 @@ import SwiftUI
 import SwiftData
 
 struct GroupListView: View {
-    @Query(sort: \SplitGroup.date, order: .reverse) private var groups: [SplitGroup]
+    @Query(filter: #Predicate<SplitGroup> { $0.isArchived == false }, sort: \SplitGroup.date, order: .reverse) private var groups: [SplitGroup]
     @Environment(\.modelContext) private var context
     @State private var showAddGroupSheet = false
     @State private var newGroupName = ""
