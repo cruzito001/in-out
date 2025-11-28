@@ -178,6 +178,65 @@ class DashboardViewModel: ObservableObject {
             return buckets
         }
     }
+
+    // MARK: - Trend Helpers
+    
+    func trendData(expenses: [Expense]) -> (values: [Double], labels: [String]) {
+        let cal = Calendar.current
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "es_MX")
+        df.setLocalizedDateFormatFromTemplate("d MMM")
+        
+        // Agrupar por día
+        let grouped = Dictionary(grouping: expenses) { exp in
+            cal.startOfDay(for: exp.date)
+        }
+        
+        // Si no hay datos, retornar vacío
+        let sortedKeys = grouped.keys.sorted()
+        guard !sortedKeys.isEmpty else { return ([], []) }
+        
+        // Rellenar huecos si es periodo corto (ej. Mes actual)
+        // Para simplificar, solo mostraremos los días con gastos ordenados
+        let values = sortedKeys.map { date -> Double in
+            let total = grouped[date]?.reduce(0) { $0 + $1.amountInCents } ?? 0
+            return Double(total) / 100.0
+        }
+        
+        let labels = sortedKeys.map { df.string(from: $0) }
+        
+        return (values, labels)
+    }
+    
+    func averageDailySpend(expenses: [Expense]) -> Double {
+        guard !expenses.isEmpty else { return 0 }
+        let cal = Calendar.current
+        let dates = expenses.map { cal.startOfDay(for: $0.date) }
+        guard let minDate = dates.min(), let maxDate = dates.max() else { return 0 }
+        
+        let days = max(1, cal.dateComponents([.day], from: minDate, to: maxDate).day ?? 1)
+        let totalCents = expenses.reduce(0) { $0 + $1.amountInCents }
+        
+        return (Double(totalCents) / 100.0) / Double(days)
+    }
+    
+    func projectedEndOfMonth(expenses: [Expense], period: Period) -> Double {
+        guard period == .mesActual else { return 0 }
+        let cal = Calendar.current
+        let now = Date()
+        
+        let totalCents = expenses.reduce(0) { $0 + $1.amountInCents }
+        let currentTotal = Double(totalCents) / 100.0
+        
+        guard let range = cal.range(of: .day, in: .month, for: now) else { return currentTotal }
+        let totalDays = range.count
+        let currentDay = cal.component(.day, from: now)
+        
+        guard currentDay > 0 else { return 0 }
+        let average = currentTotal / Double(currentDay)
+        
+        return average * Double(totalDays)
+    }
     
     // MARK: - Formatting
     
@@ -242,4 +301,3 @@ class DashboardViewModel: ObservableObject {
         expenseToEdit = expense
     }
 }
-

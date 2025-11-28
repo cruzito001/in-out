@@ -18,7 +18,7 @@ struct MainTabView: View {
                 }
                 .tag(0)
 
-            ComingSoonView()
+            SplitView()
                 .tabItem {
                     Label("División", systemImage: "divide.circle.fill")
                 }
