@@ -24,7 +24,7 @@ struct in_outApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-            .modelContainer(for: [Expense.self, Category.self])
+            .modelContainer(for: [Expense.self, Category.self, SplitGroup.self, SplitMember.self, SplitExpense.self])
         }
     }
 }
