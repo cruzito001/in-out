@@ -30,7 +30,7 @@ struct SplitView: View {
                     // Contenido Dinámico
                     switch vm.selectedTab {
                     case .quick:
-                        placeholderView(title: "Cálculo Rápido", icon: "bolt.fill", description: "Calculadora simple para dividir cuentas al instante.")
+                        QuickSplitView()
                     case .group:
                         placeholderView(title: "Grupal", icon: "person.3.fill", description: "Gestiona cuentas complejas con múltiples personas.")
                     case .saved:

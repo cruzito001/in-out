@@ -36,6 +36,8 @@ struct AddExpenseView: View {
 
     @State private var showingError: Bool = false
     @State private var errorMessage: String = ""
+    
+    var initialAmount: Double? = nil
 
     var body: some View {
         NavigationStack {
@@ -126,6 +128,11 @@ struct AddExpenseView: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(errorMessage)
+            }
+            .onAppear {
+                if let amount = initialAmount, amountText.isEmpty {
+                    amountText = String(format: "%.2f", amount)
+                }
             }
         }
     }
