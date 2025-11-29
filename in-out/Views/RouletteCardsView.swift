@@ -2,14 +2,16 @@
 //  RouletteCardsView.swift
 //  in-out
 //
+//  Created by Alan Cruz
 //
 
 import SwiftUI
+import SwiftData
 import UIKit
 
 struct RouletteCardsView: View {
-    // MARK: - Model
-    struct Participant: Identifiable, Equatable {
+    // MARK: - Models
+    struct Participant: Identifiable, Equatable, Hashable {
         let id = UUID()
         var name: String
         var color: Color
@@ -17,470 +19,372 @@ struct RouletteCardsView: View {
     
     // MARK: - State
     @State private var participants: [Participant] = []
-    @State private var selectedIndex: Int = 0
+    @State private var currentIndex: Int = 0
     @State private var isSpinning: Bool = false
-    @State private var lastWinnerIndex: Int? = nil
-    @State private var showAddSheet: Bool = false
-    @State private var newName: String = ""
-    @State private var newColor: Color = .blue
-    @State private var avoidImmediateRepeat: Bool = true
-    @State private var showWinnerBanner: Bool = false
-    @State private var winnerPulse: Bool = false
-    @State private var showValidationError: Bool = false
-    @State private var validationErrorMessage: String = ""
+    @State private var showWinner: Bool = false
     
-    // MARK: - Constants
-    private let palette: [Color] = [.blue, .indigo, .purple, .pink, .teal, .green, .orange]
+    // Importación
+    @Query(sort: \SplitGroup.date, order: .reverse) private var savedGroups: [SplitGroup]
+    @State private var showGroupImportSheet = false
+    @State private var showAddSheet = false
+    @State private var newName = ""
+    
+    // Animación
+    @State private var timer: Timer?
+    @State private var speed: Double = 0.0
+    
+    // Diseño
+    private let cardHeight: CGFloat = 120
     
     var body: some View {
         ZStack {
-            // Background
-            LinearGradient(
-                colors: [
-                    Color(.systemBackground),
-                    Color(.systemGroupedBackground),
-                    Color(.secondarySystemGroupedBackground)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-
-            ScrollView {
-                VStack(spacing: 20) {
-                    if participants.isEmpty {
-                        emptyState
-                    } else {
-                        carousel
-                    }
-                    controls
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 40)
-            }
-            .scrollIndicators(.hidden)
-            .safeAreaInset(edge: .top) {
+            // Fondo Dinámico
+            animatedBackground
+                .ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // Header Flotante
                 header
                     .padding(.horizontal, 20)
-                    .padding(.bottom, 12)
-            }
-
-            if showWinnerBanner, let winner = currentWinner {
-                winnerBanner(winner)
-                    .transition(.scale.combined(with: .opacity))
-            }
-        }
-        .sheet(isPresented: $showAddSheet) {
-            addParticipantSheet
-        }
-        .alert("Error", isPresented: $showValidationError) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(validationErrorMessage)
-        }
-    }
-    
-    // MARK: - Header
-    private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("¿Quién paga?")
-                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                    .foregroundStyle(.primary)
-                    .shadow(color: .black.opacity(0.08), radius: 2, x: 0, y: 1)
-                Text(participants.count == 1 ? "1 participante" : "\(participants.count) participantes")
-                    .font(.system(.subheadline, design: .default, weight: .medium))
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            HStack(spacing: 10) {
-                // Añadir / Limpiar lista
-                Menu {
-                    Button(action: { showAddSheet = true }) {
-                        Label("Añadir participante", systemImage: "plus.circle")
-                    }
-                    if !participants.isEmpty {
-                        Button(role: .destructive, action: clearParticipants) {
-                            Label("Limpiar lista", systemImage: "trash")
-                        }
-                    }
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .padding(10)
-                        .background(.thinMaterial, in: Circle())
-                }
-
-                // Opciones
-                Menu {
-                    Toggle("Evitar repetición inmediata", isOn: $avoidImmediateRepeat)
-                    if lastWinnerIndex != nil {
-                        Button("Limpiar sorteo", action: clearWinner)
-                    }
-                } label: {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .padding(10)
-                        .background(.thinMaterial, in: Circle())
-                }
-            }
-        }
-    }
-    
-    // MARK: - Empty State
-    private var emptyState: some View {
-        VStack(spacing: 30) {
-            Image(systemName: "person.3.fill")
-                .font(.system(size: 48, weight: .medium))
-                .foregroundStyle(.blue)
-                .shadow(color: .blue.opacity(0.3), radius: 8, x: 0, y: 4)
-            Text("Aún no hay participantes")
-                .font(.system(.title2, design: .rounded, weight: .semibold))
-                .foregroundStyle(.primary)
-            Text("Añade al menos dos participantes para empezar el sorteo")
-                .font(.system(.body, design: .default))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .padding(24)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 20))
-        .shadow(color: .black.opacity(0.08), radius: 12, x: 0, y: 6)
-        .padding(.horizontal, 4)
-    }
-    
-    // MARK: - Carousel
-    private var carousel: some View {
-        VStack(spacing: 18) {
-            TabView(selection: $selectedIndex) {
-                ForEach(Array(participants.enumerated()), id: \.element.id) { index, participant in
-                    ParticipantCard(participant: participant, isFocused: index == selectedIndex)
-                        .padding(.horizontal, 0)
-                        .tag(index)
-                        .contextMenu {
-                            Button(role: .destructive) { removeParticipant(at: index) } label: {
-                                Label("Eliminar", systemImage: "trash")
-                            }
-                        }
-                }
-            }
-            .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-            .frame(height: 280)
-            .animation(.easeInOut(duration: 0.25), value: selectedIndex)
-            
-            // participantes
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(Array(participants.enumerated()), id: \.element.id) { index, p in
-                        Button(action: { withAnimation { selectedIndex = index } }) {
-                            HStack(spacing: 6) {
-                                Circle().fill(p.color).frame(width: 8, height: 8)
-                                Text(p.name)
-                                    .font(.system(.caption, design: .rounded, weight: .medium))
-                                    .foregroundStyle(index == selectedIndex ? .blue : .primary)
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(
-                                .thinMaterial,
-                                in: Capsule()
-                            )
-                            .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
-                        }
-                    }
-                }
-                .padding(.horizontal, 6)
-            }
-        }
-    }
-    
-    // MARK: - Controls
-    private var controls: some View {
-        VStack(spacing: 14) {
-            Button(action: spin) {
-                Text(isSpinning ? "Sorteando..." : "Barajar y sortear")
-                    .font(.system(.headline, design: .rounded, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 18)
-            }
-            .background(
-                LinearGradient(colors: [Color.blue, Color.blue.opacity(0.8)], startPoint: .topLeading, endPoint: .bottomTrailing),
-                in: RoundedRectangle(cornerRadius: 16)
-            )
-            .shadow(color: .blue.opacity(0.3), radius: 12, x: 0, y: 6)
-            .disabled(participants.count < 2 || isSpinning)
-        }
-    }
-    
-    // MARK: - Winner Banner
-    private func winnerBanner(_ winner: Participant) -> some View {
-        ZStack {
-            Color.black.opacity(0.28)
-                .ignoresSafeArea()
-                .transition(.opacity)
-            
-            ZStack {
-                Circle()
-                    .stroke(winner.color.opacity(0.5), lineWidth: 6)
-                    .frame(width: 220, height: 220)
-                    .scaleEffect(winnerPulse ? 1.12 : 0.88)
-                    .opacity(winnerPulse ? 0.0 : 0.6)
-                    .animation(.easeOut(duration: 1.0).repeatForever(autoreverses: false), value: winnerPulse)
+                    .padding(.top, 20)
                 
-                Circle()
-                    .stroke(Color.white.opacity(0.35), lineWidth: 3)
-                    .frame(width: 180, height: 180)
-                    .scaleEffect(winnerPulse ? 1.0 : 0.85)
-                    .opacity(winnerPulse ? 0.0 : 0.8)
-                    .animation(.easeOut(duration: 1.2).repeatForever(autoreverses: false), value: winnerPulse)
+                Spacer()
                 
-                // winner card
-                VStack(spacing: 12) {
-                    Image(systemName: "crown.fill")
-                        .font(.system(size: 34, weight: .semibold))
-                        .foregroundStyle(.yellow)
-                    Text("Gana")
-                        .font(.system(.headline, design: .rounded, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    Text(winner.name)
-                        .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                        .foregroundStyle(.primary)
-                        .minimumScaleFactor(0.8)
-                        .lineLimit(1)
-                }
-                .padding(.horizontal, 28)
-                .padding(.vertical, 22)
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 24))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24)
-                        .stroke(
-                            LinearGradient(
-                                colors: [Color.white.opacity(0.65), Color.white.opacity(0.15)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ), lineWidth: 1
-                        )
-                )
-                .shadow(color: .black.opacity(0.18), radius: 18, x: 0, y: 8)
-                .transition(.scale.combined(with: .opacity))
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .onAppear { winnerPulse = true }
-        .onDisappear { winnerPulse = false }
-    }
-    
-    // MARK: - Add Participant Sheet
-    private var addParticipantSheet: some View {
-        NavigationView {
-            Form {
-                Section(header: Text("Nuevo Participante")) {
-                    TextField("Nombre", text: $newName)
-                    ColorPicker("Color de la tarjeta", selection: $newColor, supportsOpacity: false)
-                }
-            }
-            .navigationTitle("Añadir")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancelar") { showAddSheet = false }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Guardar") { addParticipant() }
-                        .disabled(newName.trimmingCharacters(in: .whitespaces).isEmpty)
-                }
-            }
-        }
-    }
-    
-    // MARK: - Helpers
-    private var currentWinner: Participant? {
-        guard let idx = lastWinnerIndex, participants.indices.contains(idx) else { return nil }
-        return participants[idx]
-    }
-    
-    private func addParticipant() {
-        let name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { return }
-        // Validación: evitar nombres duplicados (ignorando mayúsculas/minúsculas)
-        if participants.contains(where: { $0.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == name.lowercased() }) {
-            validationErrorMessage = "Ya existe un participante con ese nombre"
-            showValidationError = true
-            return
-        }
-        let p = Participant(name: name, color: newColor)
-        participants.append(p)
-        newName = ""
-        newColor = palette.randomElement() ?? .blue
-        showAddSheet = false
-        if participants.count == 1 { selectedIndex = 0 }
-    }
-    
-    private func removeParticipant(at index: Int) {
-        guard participants.indices.contains(index) else { return }
-        participants.remove(at: index)
-        if participants.isEmpty {
-            selectedIndex = 0
-            lastWinnerIndex = nil
-            showWinnerBanner = false
-        } else {
-            selectedIndex = min(selectedIndex, participants.count - 1)
-        }
-    }
-    
-    private func spin() {
-        guard participants.count >= 2, !isSpinning else { return }
-        isSpinning = true
-        showWinnerBanner = false
-        
-        // Decider ganador
-        var winner = Int.random(in: 0..<participants.count)
-        if avoidImmediateRepeat, participants.count > 1, let last = lastWinnerIndex, winner == last {
-            var options = Array(0..<participants.count)
-            options.removeAll { $0 == last }
-            if let alt = options.randomElement() { winner = alt }
-        }
-        
-        // Animación de giro con desaceleración
-        let totalSteps = 18 + Int.random(in: 6...12) // vueltas visuales
-        var step = 0
-        var delay: Double = 0.06
-        
-        func performStep() {
-            guard step < totalSteps else {
-                withAnimation(.easeOut(duration: 0.45)) {
-                    selectedIndex = winner
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    announceWinner(index: winner)
-                }
-                return
-            }
-            withAnimation(.easeInOut(duration: delay)) {
-                selectedIndex = (selectedIndex + 1) % participants.count
-            }
-            step += 1
-            delay = min(delay * 1.08, 0.18)
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                performStep()
-            }
-        }
-        
-        // Haptic
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        performStep()
-    }
-    
-    private func announceWinner(index: Int) {
-        lastWinnerIndex = index
-        // Haptic de éxito
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-            showWinnerBanner = true
-        }
-        // Ocultar banner tras unos segundos
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
-            withAnimation(.easeOut(duration: 0.5)) {
-                showWinnerBanner = false
-            }
-            isSpinning = false
-        }
-    }
-
-    private func clearParticipants() {
-        participants.removeAll()
-        selectedIndex = 0
-        lastWinnerIndex = nil
-        showWinnerBanner = false
-    }
-
-    private func clearWinner() {
-        lastWinnerIndex = nil
-        showWinnerBanner = false
-    }
-}
-
-// MARK: - Card
-private struct ParticipantCard: View {
-    let participant: RouletteCardsView.Participant
-    let isFocused: Bool
-    
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 24)
-                .fill(
-                    LinearGradient(
-                        colors: [participant.color.opacity(0.9), participant.color.opacity(0.6)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.white.opacity(0.12), Color.white.opacity(0.02)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .blendMode(.screen)
-                )
-                .shadow(color: .black.opacity(isFocused ? 0.15 : 0.08), radius: isFocused ? 14 : 8, x: 0, y: 6)
-            
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Image(systemName: "creditcard.fill")
-                        .font(.system(.title2, design: .default, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.9))
-                    Spacer()
-                    // EMV chip detail
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.yellow.opacity(0.85), Color.orange.opacity(0.7)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 24, height: 18)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                .stroke(Color.white.opacity(0.35), lineWidth: 0.8)
-                        )
-                        .overlay(
-                            HStack(spacing: 3) {
-                                Capsule().fill(Color.white.opacity(0.35)).frame(width: 5, height: 1.2)
-                                Capsule().fill(Color.white.opacity(0.35)).frame(width: 5, height: 1.2)
-                                Capsule().fill(Color.white.opacity(0.35)).frame(width: 5, height: 1.2)
-                            }
-                        )
+                // Área de Ruleta
+                if participants.isEmpty {
+                    emptyState
+                } else {
+                    rouletteWheel
                 }
                 
                 Spacer()
                 
-                Text(participant.name)
-                    .font(.system(.title, design: .rounded, weight: .bold))
-                    .foregroundStyle(.white)
-                    .minimumScaleFactor(0.8)
-                    .lineLimit(1)
-                
-                Text("Tarjeta de participante")
-                    .font(.system(.footnote, design: .rounded, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.85))
+                // Controles
+                controls
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 40)
             }
-            .padding(22)
+            
+            if showWinner {
+                winnerOverlay
+            }
         }
-        .frame(height: 240)
-        .scaleEffect(isFocused ? 1.0 : 0.93)
-        .rotation3DEffect(
-            .degrees(isFocused ? 0 : 8),
-            axis: (x: 0, y: 1, z: 0)
+        .sheet(isPresented: $showGroupImportSheet) {
+            groupImportView
+                .presentationDetents([.medium, .large])
+                .presentationBackground(.thinMaterial)
+        }
+        .alert("Nuevo Participante", isPresented: $showAddSheet) {
+            TextField("Nombre", text: $newName)
+            Button("Cancelar", role: .cancel) { newName = "" }
+            Button("Añadir") { addParticipant() }
+        }
+    }
+    
+    // MARK: - Components
+    
+    private var animatedBackground: some View {
+        let currentColor = participants.isEmpty ? Color.gray : participants[currentIndex % participants.count].color
+        
+        return ZStack {
+            Color.black
+            
+            // Mesh Gradient Simulado (Círculos borrosos)
+            GeometryReader { geo in
+                ZStack {
+                    Circle()
+                        .fill(currentColor.opacity(0.4))
+                        .frame(width: geo.size.width * 1.5)
+                        .blur(radius: 100)
+                        .offset(x: -geo.size.width * 0.3, y: -geo.size.height * 0.3)
+                    
+                    Circle()
+                        .fill(currentColor.opacity(0.3))
+                        .frame(width: geo.size.width * 1.2)
+                        .blur(radius: 80)
+                        .offset(x: geo.size.width * 0.4, y: geo.size.height * 0.4)
+                }
+            }
+        }
+        .animation(.easeInOut(duration: 0.5), value: currentIndex)
+    }
+    
+    private var header: some View {
+        HStack {
+            Text("Ruleta")
+                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+            
+            Spacer()
+            
+            Menu {
+                Button(action: { showAddSheet = true }) {
+                    Label("Añadir manual", systemImage: "person.badge.plus")
+                }
+                Button(action: { showGroupImportSheet = true }) {
+                    Label("Importar de Grupo", systemImage: "person.3.fill")
+                }
+                if !participants.isEmpty {
+                    Divider()
+                    Button(role: .destructive, action: { participants.removeAll() }) {
+                        Label("Limpiar todo", systemImage: "trash")
+                    }
+                }
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(.white)
+                    .padding(12)
+                    .background(.white.opacity(0.2), in: Circle())
+            }
+        }
+    }
+    
+    private var emptyState: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "person.3.sequence.fill")
+                .font(.system(size: 60))
+                .foregroundStyle(.white.opacity(0.5))
+            
+            Text("Añade participantes")
+                .font(.title3.bold())
+                .foregroundStyle(.white.opacity(0.8))
+            
+            Button(action: { showGroupImportSheet = true }) {
+                Text("Importar Grupo")
+                    .font(.headline)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+                    .background(Color.white, in: Capsule())
+                    .foregroundStyle(.black)
+            }
+        }
+    }
+    
+    private var rouletteWheel: some View {
+        let count = participants.count
+        let current = participants[currentIndex % count]
+        let prevIndex = (currentIndex - 1 + count) % count
+        let nextIndex = (currentIndex + 1) % count
+        
+        return ZStack {
+            // Indicador de selección (Simplificado)
+            HStack {
+                Image(systemName: "arrowtriangle.right.fill")
+                Spacer()
+                Image(systemName: "arrowtriangle.left.fill")
+            }
+            .foregroundStyle(.white.opacity(0.8))
+            .padding(.horizontal, 20)
+            
+            VStack(spacing: 0) {
+                // Anterior (Desvanecido)
+                if count > 1 {
+                    Text(participants[prevIndex].name)
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.3))
+                        .frame(height: cardHeight)
+                        .scaleEffect(0.8)
+                        .blur(radius: 2)
+                        .minimumScaleFactor(0.6)
+                        .lineLimit(1)
+                }
+                
+                // ACTUAL
+                Text(current.name)
+                    .font(.system(size: 56, weight: .black, design: .rounded))
+                    .foregroundStyle(.white)
+                    .frame(height: cardHeight)
+                    .scaleEffect(1.1)
+                    .shadow(color: current.color.opacity(0.8), radius: 30, x: 0, y: 0)
+                    .minimumScaleFactor(0.4) // Permite reducir tamaño si es largo
+                    .lineLimit(1)
+                    .padding(.horizontal, 40) // Espacio para las flechas
+                    .id("center-\(currentIndex)")
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .top).combined(with: .opacity),
+                        removal: .move(edge: .bottom).combined(with: .opacity)
+                    ))
+                
+                // Siguiente (Desvanecido)
+                if count > 1 {
+                    Text(participants[nextIndex].name)
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.3))
+                        .frame(height: cardHeight)
+                        .scaleEffect(0.8)
+                        .blur(radius: 2)
+                        .minimumScaleFactor(0.6)
+                        .lineLimit(1)
+                }
+            }
+            .clipped() // Solo clippeamos verticalmente lo necesario
+        }
+        .frame(height: cardHeight * 3)
+        .mask(
+            LinearGradient(
+                stops: [
+                    .init(color: .clear, location: 0),
+                    .init(color: .black, location: 0.2),
+                    .init(color: .black, location: 0.8),
+                    .init(color: .clear, location: 1)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
         )
-        .animation(.easeInOut(duration: 0.25), value: isFocused)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(Text("Participante: \(participant.name)"))
+    }
+    
+    private var controls: some View {
+        Button(action: spin) {
+            Text(isSpinning ? "Girando..." : "GIRAR")
+                .font(.system(size: 24, weight: .heavy, design: .rounded))
+                .foregroundStyle(.black)
+                .frame(maxWidth: .infinity)
+                .frame(height: 70)
+                .background(Color.white, in: RoundedRectangle(cornerRadius: 20))
+                .shadow(color: .white.opacity(0.3), radius: 15)
+                .scaleEffect(isSpinning ? 0.95 : 1.0)
+                .animation(.spring, value: isSpinning)
+        }
+        .disabled(isSpinning || participants.count < 2)
+        .opacity(participants.count < 2 ? 0.5 : 1)
+    }
+    
+    private var winnerOverlay: some View {
+        ZStack {
+            // Fondo Blur
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .ignoresSafeArea()
+            
+            // Partículas o Glow extra (Opcional, simple por ahora)
+            
+            VStack(spacing: 40) {
+                Text("🎉 El elegido es")
+                    .font(.title2.bold())
+                    .foregroundStyle(.white.opacity(0.9))
+                
+                let winner = participants[currentIndex % participants.count]
+                
+                Text(winner.name)
+                    .font(.system(size: 70, weight: .black, design: .rounded))
+                    .foregroundStyle(winner.color) // Color del ganador
+                    .multilineTextAlignment(.center)
+                    .shadow(color: winner.color.opacity(0.8), radius: 40)
+                    .minimumScaleFactor(0.5)
+                    .padding(.horizontal)
+                    .scaleEffect(1.2) // Zoom in
+                
+                Button("Continuar") {
+                    withAnimation { showWinner = false }
+                }
+                .font(.headline)
+                .padding(.horizontal, 40)
+                .padding(.vertical, 16)
+                .background(Color.white, in: Capsule())
+                .foregroundStyle(.black)
+                .shadow(radius: 10)
+            }
+        }
+        .transition(.opacity.combined(with: .scale(scale: 1.1)))
+        .zIndex(100)
+    }
+    
+    // MARK: - Logic
+    
+    private func spin() {
+        isSpinning = true
+        speed = 0.02 // Velocidad inicial (segundos por tick)
+        var ticks = 0
+        let maxTicks = Int.random(in: 30...50) // Duración aleatoria
+        
+        // Timer recursivo para desaceleración variable
+        func runTick() {
+            // Detener
+            if ticks >= maxTicks {
+                finishSpin()
+                return
+            }
+            
+            // Avanzar índice
+            withAnimation(.linear(duration: speed)) {
+                currentIndex += 1
+            }
+            
+            // Haptic Feedback
+            let style: UIImpactFeedbackGenerator.FeedbackStyle = ticks < maxTicks - 10 ? .light : .medium
+            UIImpactFeedbackGenerator(style: style).impactOccurred()
+            
+            // Calcular nueva velocidad (Desaceleración exponencial)
+            if ticks > maxTicks - 15 {
+                speed *= 1.15 // Frenar drásticamente al final
+            } else if ticks < 10 {
+                speed *= 0.9 // Acelerar al principio
+            }
+            
+            ticks += 1
+            
+            // Programar siguiente tick
+            DispatchQueue.main.asyncAfter(deadline: .now() + speed) {
+                runTick()
+            }
+        }
+        
+        runTick()
+    }
+    
+    private func finishSpin() {
+        isSpinning = false
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                showWinner = true
+            }
+        }
+    }
+    
+    private func addParticipant() {
+        guard !newName.isEmpty else { return }
+        let colors: [Color] = [.blue, .red, .green, .orange, .purple, .pink, .cyan, .yellow]
+        participants.append(Participant(name: newName, color: colors.randomElement() ?? .white))
+        newName = ""
+    }
+    
+    // MARK: - Import Sheet
+    private var groupImportView: some View {
+        NavigationView {
+            List(savedGroups) { group in
+                Button {
+                    importGroup(group)
+                } label: {
+                    HStack {
+                        Text(group.name)
+                            .font(.headline)
+                        Spacer()
+                        Text("\(group.members.count) miembros")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .navigationTitle("Seleccionar Grupo")
+            .overlay {
+                if savedGroups.isEmpty {
+                    ContentUnavailableView("No hay grupos", systemImage: "person.3", description: Text("Crea grupos en la pestaña División para importarlos aquí."))
+                }
+            }
+        }
+    }
+    
+    private func importGroup(_ group: SplitGroup) {
+        let newParticipants = group.members.map { member in
+            Participant(
+                name: member.name,
+                color: Color(hex: member.colorHex) ?? .blue
+            )
+        }
+        participants.append(contentsOf: newParticipants)
+        showGroupImportSheet = false
     }
 }
 
