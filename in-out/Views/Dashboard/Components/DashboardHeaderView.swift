@@ -23,6 +23,16 @@ struct DashboardHeaderView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            
+            // Botón de Búsqueda
+            Button(action: { vm.showSearch = true }) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .padding(10)
+                    .background(.thinMaterial, in: Circle())
+            }
+            
             Menu {
                 Button(action: { vm.showAddSheet = true }) {
                     Label("Agregar gasto", systemImage: "plus.circle")

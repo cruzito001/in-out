@@ -37,6 +37,7 @@ class DashboardViewModel: ObservableObject {
     // MARK: - Navigation State
     @Published var showAddSheet: Bool = false
     @Published var showAddCategorySheet: Bool = false
+    @Published var showSearch: Bool = false // Búsqueda global
     @Published var showDeleteError: Bool = false
     @Published var deleteErrorMessage: String = ""
     @Published var expenseToEdit: Expense?

@@ -46,6 +46,9 @@ struct SpendingDashboardView: View {
             AddCategoryView()
                 .presentationBackground(.thinMaterial)
         }
+        .sheet(isPresented: $vm.showSearch) {
+            GlobalSearchView()
+        }
         .fullScreenCover(item: $vm.expenseToEdit) { expense in
             EditExpenseView(expense: expense)
                 .presentationBackground(.thinMaterial)
