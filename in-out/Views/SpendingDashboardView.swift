@@ -106,7 +106,7 @@ struct SpendingDashboardView: View {
                             }
             case .tendencia:
                  Section {
-                    DashboardTrendView(vm: vm, expenses: vm.filteredExpenses(allExpenses: allExpenses))
+                    DashboardTrendView(vm: vm, expenses: vm.filteredExpenses(allExpenses: allExpenses), allExpenses: allExpenses)
                  }
              }
         }

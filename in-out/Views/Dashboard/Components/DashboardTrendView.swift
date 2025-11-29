@@ -10,13 +10,39 @@ import SwiftUI
 struct DashboardTrendView: View {
     @ObservedObject var vm: DashboardViewModel
     let expenses: [Expense]
+    let allExpenses: [Expense] // Añadido para insights globales
     
     var body: some View {
         let trendData = vm.trendData(expenses: expenses)
         let avgDaily = vm.averageDailySpend(expenses: expenses)
         let projected = vm.projectedEndOfMonth(expenses: expenses, period: vm.selectedPeriod)
+        let insights = vm.generateInsights(allExpenses: allExpenses)
         
         VStack(spacing: 16) {
+            // 0. Insights
+            if !insights.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Image(systemName: "sparkles")
+                            .foregroundStyle(.yellow)
+                        Text("Análisis Inteligente")
+                            .font(.system(.headline, design: .rounded, weight: .bold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 4)
+                    
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 14) {
+                            ForEach(insights) { insight in
+                                InsightCardView(insight: insight)
+                            }
+                        }
+                        .padding(.horizontal, 4)
+                        .padding(.bottom, 10)
+                    }
+                }
+            }
+            
             // 1. Gráfico de Tendencia
             VStack(alignment: .leading, spacing: 12) {
                 HStack {

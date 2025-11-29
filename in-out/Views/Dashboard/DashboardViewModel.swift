@@ -8,6 +8,22 @@
 import SwiftUI
 import SwiftData
 
+// MARK: - Insight Models
+struct Insight: Identifiable {
+    let id = UUID()
+    let title: String
+    let message: String
+    let icon: String
+    let color: Color
+    let type: InsightType
+}
+
+enum InsightType {
+    case warning // Rojo/Naranja (Gastaste más)
+    case success // Verde (Ahorraste, racha)
+    case info    // Azul (Datos curiosos)
+}
+
 @MainActor
 class DashboardViewModel: ObservableObject {
     // MARK: - UI State
@@ -238,6 +254,105 @@ class DashboardViewModel: ObservableObject {
         return average * Double(totalDays)
     }
     
+    // MARK: - Insights (Smart Analysis)
+    func generateInsights(allExpenses: [Expense]) -> [Insight] {
+        var insights: [Insight] = []
+        let cal = Calendar.current
+        let now = Date()
+        
+        // 1. Racha sin gastos (Días consecutivos)
+        let today = cal.startOfDay(for: now)
+        var checkDate = today
+        var daysWithoutSpending = 0
+        let expenseDates = Set(allExpenses.map { cal.startOfDay(for: $0.date) })
+        
+        // Si hoy no hay gastos, contamos hoy
+        if !expenseDates.contains(today) {
+            daysWithoutSpending = 1
+            // Verificar días anteriores
+            for i in 1...30 { // Limite de 30 días para no ciclar infinito
+                guard let prev = cal.date(byAdding: .day, value: -i, to: today) else { break }
+                if !expenseDates.contains(prev) {
+                    daysWithoutSpending += 1
+                } else {
+                    break
+                }
+            }
+        }
+        
+        if daysWithoutSpending >= 2 {
+            insights.append(Insight(
+                title: "¡Racha de ahorro!",
+                message: "Llevas \(daysWithoutSpending) días seguidos sin registrar gastos. ¡Sigue así!",
+                icon: "flame.fill",
+                color: .orange,
+                type: .success
+            ))
+        }
+        
+        // 2. Comparativa Mes Anterior (Categoría Top)
+        // Obtener top category de este mes
+        let thisMonth = dateInterval(for: .mesActual)
+        let expensesThisMonth = allExpenses.filter { thisMonth.contains($0.date) }
+        
+        if let topCat = topCategory(expensesThisMonth) {
+            // Obtener gasto de esa categoría el mes pasado
+            let lastMonth = dateInterval(for: .mesAnterior)
+            let expensesLastMonth = allExpenses.filter {
+                lastMonth.contains($0.date) && $0.category == topCat.name && $0.currencyCode == topCat.currency
+            }
+            let totalLastMonth = expensesLastMonth.reduce(0) { $0 + $1.amountInCents }
+            
+            if totalLastMonth > 0 {
+                let diff = Double(topCat.total - totalLastMonth)
+                let percent = diff / Double(totalLastMonth)
+                
+                if percent > 0.15 { // 15% más
+                    insights.append(Insight(
+                        title: "Alerta en \(topCat.name)",
+                        message: "Estás gastando un \(formatPercent(percent)) más en \(topCat.name) que el mes pasado.",
+                        icon: "exclamationmark.triangle.fill",
+                        color: .red,
+                        type: .warning
+                    ))
+                } else if percent < -0.15 { // 15% menos
+                    insights.append(Insight(
+                        title: "Ahorro en \(topCat.name)",
+                        message: "Has reducido tu gasto en \(topCat.name) un \(formatPercent(abs(percent))) vs el mes anterior.",
+                        icon: "arrow.down.heart.fill",
+                        color: .green,
+                        type: .success
+                    ))
+                }
+            }
+        }
+        
+        // 3. Gasto Hormiga (Detectar muchos gastos pequeños < $50 MXN)
+        let smallExpenses = expensesThisMonth.filter { Double($0.amountInCents) / 100.0 < 50.0 }
+        if smallExpenses.count > 5 {
+             insights.append(Insight(
+                 title: "Gastos Hormiga",
+                 message: "Has registrado \(smallExpenses.count) gastos menores a $50. Suman \(formatAmount(smallExpenses.reduce(0){$0 + $1.amountInCents}, currencyCode: "MXN")).",
+                 icon: "ant.fill",
+                 color: .purple,
+                 type: .info
+             ))
+        }
+        
+        // 4. Placeholder (Si no hay nada, dar un tip)
+        if insights.isEmpty {
+            insights.append(Insight(
+                title: "Todo bajo control",
+                message: "Tus finanzas se ven saludables este mes. ¡Sigue registrando!",
+                icon: "checkmark.seal.fill",
+                color: .blue,
+                type: .info
+            ))
+        }
+        
+        return insights
+    }
+    
     // MARK: - Formatting
     
     func formatAmount(_ cents: Int, currencyCode: String) -> String {
@@ -256,7 +371,7 @@ class DashboardViewModel: ObservableObject {
         case "USD": return "dollarsign.circle"
         case "EUR": return "eurosign.circle"
         default: return "banknote"
-        }
+    }
     }
     
     func shortDate(_ date: Date) -> String {
@@ -272,8 +387,8 @@ class DashboardViewModel: ObservableObject {
     }
     
     func formatPercent(_ value: Double) -> String {
-        let pct = max(0.0, min(1.0, value))
-        return String(format: "%.0f%%", pct * 100.0)
+        let pct = value // Valor real, no clampeado
+        return String(format: "%.0f%%", abs(pct) * 100.0)
     }
     
     // MARK: - Actions
