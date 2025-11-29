@@ -2,392 +2,235 @@
 //  SettingsView.swift
 //  in-out
 //
-//  Created by Alan Joel Cruz Ortega on 04/09/25.
+//  Created by Alan Cruz
 //
 
 import SwiftUI
+import SwiftData
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
-    // MARK: - State Variables
-    @State private var selectedCurrency = "MXM"
-    @State private var selectedTheme = "Automático"
-    @State private var selectedLanguage = "Español"
-    @State private var faceIDEnabled = true
-    @State private var pinEnabled = false
-    @State private var expenseNotifications = true
-    @State private var budgetNotifications = true
-    @State private var monthlyReports = false
-    @State private var monthlyBudget = "1000"
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.colorScheme) var colorScheme
     
-    let currencies = ["MXM", "USD", "EUR", "GBP", "JPY"]
-    let themes = ["Claro", "Oscuro", "Automático"]
-    let languages = ["Español", "English"]
+    // MARK: - App Storage
+    @AppStorage("enableHaptics") private var enableHaptics: Bool = true
+    @AppStorage("appVersion") private var appVersion: String = "1.0.0"
+    
+    // MARK: - Data Queries
+    @Query private var allExpenses: [Expense]
+    @Query private var allGroups: [SplitGroup]
+    
+    // MARK: - State
+    @State private var showDeleteAlert = false
+    @State private var deleteTarget: DeleteTarget = .expenses
+    
+    enum DeleteTarget {
+        case expenses
+        case groups
+    }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
-                LinearGradient(
-                    colors: [
-                        Color(.systemBackground),
-                        Color(.systemGroupedBackground),
-                        Color(.secondarySystemGroupedBackground)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
+                Color(.systemGroupedBackground).ignoresSafeArea()
                 
-                ScrollView {
-                VStack(spacing: 24) {
-                    // Header
-                    headerSection
+                VStack(spacing: 0) {
+                    // MARK: - Header Principal (Estilo Dashboard)
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Configuración")
+                                .font(.system(size: 34, weight: .bold, design: .rounded))
+                                .foregroundStyle(.primary)
+                            
+                            Text("Preferencias y datos")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        
+                        Image(systemName: "gear")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.white)
+                            .frame(width: 44, height: 44)
+                            .background(Color.gray.gradient, in: Circle())
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 20)
+                    .padding(.bottom, 10)
                     
-                    // Perfil de Usuario
-                    profileSection
-                    
-                    // Configuración de App
-                    appConfigSection
-                    
-                    // Finanzas
-                    financeSection
-                    
-                    // Seguridad y Privacidad
-                    securitySection
-                    
-                    // Notificaciones
-                    notificationsSection
-                    
-                    // Soporte
-                    supportSection
-                    
-                    Spacer(minLength: 100)
+                    // MARK: - Lista de Opciones
+                    List {
+                        // MARK: - Preferencias
+                        Section {
+                            // Toggle Haptics
+                            Toggle(isOn: $enableHaptics) {
+                                SettingsLabel(icon: "iphone.gen3", color: .indigo, title: "Vibración (Haptics)")
+                            }
+                        } header: {
+                            Text("General")
+                        } footer: {
+                            Text("Activa la respuesta háptica para sentir vibraciones en la Ruleta y botones.")
+                        }
+                        
+                        // MARK: - Datos
+                        Section("Datos") {
+                            if allExpenses.isEmpty {
+                                ContentUnavailableView("Sin datos para exportar", systemImage: "list.bullet.clipboard")
+                                    .frame(height: 80)
+                                    .listRowBackground(Color.clear)
+                            } else {
+                                ShareLink(item: generateCSV(), preview: SharePreview("Gastos in-out", image: Image(systemName: "tablecells"))) {
+                                    HStack {
+                                        SettingsLabel(icon: "square.and.arrow.up.fill", color: .blue, title: "Exportar Gastos (CSV)")
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption.bold())
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                }
+                                .foregroundStyle(.primary)
+                            }
+                        }
+                        
+                        // MARK: - Zona de Peligro
+                        Section {
+                            Button(role: .destructive) {
+                                deleteTarget = .expenses
+                                showDeleteAlert = true
+                            } label: {
+                                SettingsLabel(icon: "trash.fill", color: .red, title: "Borrar todos los Gastos")
+                                    .foregroundStyle(.red)
+                            }
+                            
+                            Button(role: .destructive) {
+                                deleteTarget = .groups
+                                showDeleteAlert = true
+                            } label: {
+                                SettingsLabel(icon: "person.3.fill", color: .orange, title: "Borrar todos los Grupos")
+                                    .foregroundStyle(.red)
+                            }
+                        } header: {
+                            Text("Zona de Peligro")
+                        } footer: {
+                            Text("Estas acciones no se pueden deshacer.")
+                        }
+                        
+                        // MARK: - Acerca de
+                        Section {
+                            HStack {
+                                SettingsLabel(icon: "info.circle.fill", color: .gray, title: "Versión")
+                                Spacer()
+                                Text(appVersion)
+                                    .foregroundStyle(.secondary)
+                            }
+                            
+                            Link(destination: URL(string: "https://github.com/cruzito001?tab=repositories")!) {
+                                HStack {
+                                    SettingsLabel(icon: "hammer.fill", color: .purple, title: "Desarrollador")
+                                    Spacer()
+                                    Text("Alan Cruz")
+                                        .foregroundStyle(.secondary)
+                                    Image(systemName: "arrow.up.right")
+                                        .font(.caption)
+                                        .foregroundStyle(.tertiary)
+                                }
+                            }
+                            .foregroundStyle(.primary)
+                        } header: {
+                            Text("Información")
+                        }
+                    }
+                    .scrollContentBackground(.hidden) // Para que se vea el fondo del ZStack
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
             }
-            
-
-        }
-        .navigationBarHidden(true)
-        }
-    }
-    
-    // MARK: - Header Section
-    private var headerSection: some View {
-        VStack(spacing: 8) {
-            Text("Configuración")
-                .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                .foregroundStyle(.primary)
-                .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
-            
-            Text("Personaliza tu experiencia")
-                .font(.system(.subheadline, design: .default, weight: .medium))
-                .foregroundStyle(.secondary)
-        }
-        .padding(.bottom, 10)
-    }
-    
-    // MARK: - Profile Section
-    private var profileSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            sectionHeader("Perfil de Usuario", icon: "person.circle.fill")
-            
-            HStack(spacing: 16) {
-                // Foto de perfil placeholder
-                Circle()
-                    .fill(LinearGradient(
-                        colors: [Color.blue.opacity(0.3), Color.blue.opacity(0.1)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
-                    .frame(width: 60, height: 60)
-                    .overlay(
-                        Image(systemName: "person.fill")
-                            .font(.title2)
-                            .foregroundStyle(.blue)
+            .alert(isPresented: $showDeleteAlert) {
+                switch deleteTarget {
+                case .expenses:
+                    return Alert(
+                        title: Text("¿Borrar Gastos?"),
+                        message: Text("Esta acción eliminará \(allExpenses.count) registros de gastos permanentemente."),
+                        primaryButton: .destructive(Text("Eliminar")) { deleteAllExpenses() },
+                        secondaryButton: .cancel()
                     )
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Usuario")
-                        .font(.system(.headline, design: .rounded, weight: .semibold))
-                        .foregroundStyle(.primary)
-                    
-                    Text("usuario@email.com")
-                        .font(.system(.subheadline, design: .default, weight: .regular))
-                        .foregroundStyle(.secondary)
-                }
-                
-                Spacer()
-                
-                Button(action: editProfileAction) {
-                    Text("Editar")
-                        .font(.system(.caption, design: .rounded, weight: .semibold))
-                        .foregroundStyle(.blue)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(.blue.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                case .groups:
+                    return Alert(
+                        title: Text("¿Borrar Grupos?"),
+                        message: Text("Esta acción eliminará \(allGroups.count) grupos y su historial."),
+                        primaryButton: .destructive(Text("Eliminar")) { deleteAllGroups() },
+                        secondaryButton: .cancel()
+                    )
                 }
             }
         }
-        .padding(20)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
     }
     
-    // MARK: - App Configuration Section
-    private var appConfigSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            sectionHeader("Configuración de App", icon: "gear")
-            
-            VStack(spacing: 12) {
-                settingRow("Moneda", icon: "dollarsign.circle.fill", color: .green) {
-                    Picker("Moneda", selection: $selectedCurrency) {
-                        ForEach(currencies, id: \.self) { currency in
-                            Text(currency).tag(currency)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                }
-                
-                Divider().opacity(0.5)
-                
-                settingRow("Tema", icon: "paintbrush.fill", color: .purple) {
-                    Picker("Tema", selection: $selectedTheme) {
-                        ForEach(themes, id: \.self) { theme in
-                            Text(theme).tag(theme)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                }
-                
-                Divider().opacity(0.5)
-                
-                settingRow("Idioma", icon: "globe", color: .blue) {
-                    Picker("Idioma", selection: $selectedLanguage) {
-                        ForEach(languages, id: \.self) { language in
-                            Text(language).tag(language)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                }
-            }
-        }
-        .padding(20)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
-    }
+    // MARK: - Helpers
     
-    // MARK: - Finance Section
-    private var financeSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            sectionHeader("Finanzas", icon: "chart.pie.fill")
-            
-            VStack(spacing: 12) {
-                settingButton("Categorías de Gastos", icon: "tag.fill", color: .orange, action: categoriesAction)
-                
-                Divider().opacity(0.5)
-                
-                settingRow("Presupuesto Mensual", icon: "banknote.fill", color: .green) {
-                    TextField("$20000", text: $monthlyBudget)
-                        .textFieldStyle(.plain)
-                        .multilineTextAlignment(.trailing)
-                        .keyboardType(.numberPad)
-                }
-                
-                Divider().opacity(0.5)
-                
-                settingButton("Recordatorios de Pagos", icon: "bell.fill", color: .red, action: remindersAction)
-                
-                Divider().opacity(0.5)
-                
-                settingButton("Exportar Datos", icon: "square.and.arrow.up.fill", color: .blue, action: exportDataAction)
-            }
-        }
-        .padding(20)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
-    }
-    
-    // MARK: - Security Section
-    private var securitySection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            sectionHeader("Seguridad y Privacidad", icon: "lock.shield.fill")
-            
-            VStack(spacing: 12) {
-                settingRow("Face ID / Touch ID", icon: "faceid", color: .blue) {
-                    Toggle("", isOn: $faceIDEnabled)
-                        .labelsHidden()
-                }
-                
-                Divider().opacity(0.5)
-                
-                settingRow("PIN de Acceso", icon: "number.circle.fill", color: .indigo) {
-                    Toggle("", isOn: $pinEnabled)
-                        .labelsHidden()
-                }
-                
-                Divider().opacity(0.5)
-                
-                settingButton("Copia de Seguridad", icon: "icloud.fill", color: .cyan, action: backupAction)
-                
-                Divider().opacity(0.5)
-                
-                settingButton("Privacidad de Datos", icon: "hand.raised.fill", color: .gray, action: privacyAction)
-            }
-        }
-        .padding(20)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
-    }
-    
-    // MARK: - Notifications Section
-    private var notificationsSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            sectionHeader("Notificaciones", icon: "bell.fill")
-            
-            VStack(spacing: 12) {
-                settingRow("Recordatorios de Gastos", icon: "exclamationmark.circle.fill", color: .orange) {
-                    Toggle("", isOn: $expenseNotifications)
-                        .labelsHidden()
-                }
-                
-                Divider().opacity(0.5)
-                
-                settingRow("Límites de Presupuesto", icon: "chart.line.uptrend.xyaxis.circle.fill", color: .red) {
-                    Toggle("", isOn: $budgetNotifications)
-                        .labelsHidden()
-                }
-                
-                Divider().opacity(0.5)
-                
-                settingRow("Reportes Mensuales", icon: "doc.text.fill", color: .blue) {
-                    Toggle("", isOn: $monthlyReports)
-                        .labelsHidden()
-                }
-            }
-        }
-        .padding(20)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
-    }
-    
-    // MARK: - Support Section
-    private var supportSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            sectionHeader("Soporte", icon: "questionmark.circle.fill")
-            
-            VStack(spacing: 12) {
-                settingButton("Centro de Ayuda", icon: "book.fill", color: .blue, action: helpCenterAction)
-                
-                Divider().opacity(0.5)
-                
-                settingButton("Contactar Soporte", icon: "message.fill", color: .green, action: contactSupportAction)
-                
-                Divider().opacity(0.5)
-                
-                settingButton("Valorar App", icon: "star.fill", color: .yellow, action: rateAppAction)
-                
-                Divider().opacity(0.5)
-                
-                settingButton("Términos y Condiciones", icon: "doc.text.fill", color: .gray, action: termsAction)
-            }
-        }
-        .padding(20)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
-    }
-    
-    // MARK: - Helper Views
-    private func sectionHeader(_ title: String, icon: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundStyle(.blue)
-            
-            Text(title)
-                .font(.system(.headline, design: .rounded, weight: .semibold))
-                .foregroundStyle(.primary)
-        }
-    }
-    
-    private func settingRow<Content: View>(_ title: String, icon: String, color: Color, @ViewBuilder content: () -> Content) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundStyle(color)
-                .frame(width: 24)
-            
-            Text(title)
-                .font(.system(.body, design: .default, weight: .medium))
-                .foregroundStyle(.primary)
-            
-            Spacer()
-            
-            content()
-        }
-    }
-    
-    private func settingButton(_ title: String, icon: String, color: Color, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+    // Componente auxiliar para estilo "iOS Settings"
+    private struct SettingsLabel: View {
+        let icon: String
+        let color: Color
+        let title: String
+        
+        var body: some View {
             HStack(spacing: 12) {
                 Image(systemName: icon)
-                    .font(.title3)
-                    .foregroundStyle(color)
-                    .frame(width: 24)
+                    .font(.subheadline)
+                    .foregroundStyle(.white)
+                    .frame(width: 28, height: 28)
+                    .background(color.gradient, in: RoundedRectangle(cornerRadius: 6))
                 
                 Text(title)
-                    .font(.system(.body, design: .default, weight: .medium))
-                    .foregroundStyle(.primary)
-                
-                Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
             }
         }
-        .buttonStyle(.plain)
     }
     
-    // MARK: - Actions
-    private func editProfileAction() {
-        // Implementar edición de perfil
+    // MARK: - Logic
+    
+    private func generateCSV() -> String {
+        var csvString = "Fecha,Concepto,Monto,Categoría\n"
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .medium
+        dateFormatter.timeStyle = .none
+        
+        for expense in allExpenses {
+            let date = dateFormatter.string(from: expense.date)
+            
+            let safeTitle = expense.title ?? "Gasto"
+            let title = safeTitle.contains(",") ? "\"\(safeTitle)\"" : safeTitle
+            
+            let amountValue = Double(expense.amountInCents) / 100.0
+            let amount = String(format: "%.2f", amountValue)
+            
+            let catString = expense.category
+            let category = catString.contains(",") ? "\"\(catString)\"" : catString
+            
+            csvString.append("\(date),\(title),\(amount),\(category)\n")
+        }
+        
+        return csvString
     }
     
-    private func categoriesAction() {
-        // Implementar gestión de categorías
+    private func deleteAllExpenses() {
+        withAnimation {
+            for expense in allExpenses {
+                modelContext.delete(expense)
+            }
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+        }
     }
     
-    private func remindersAction() {
-        // Implementar recordatorios
-    }
-    
-    private func exportDataAction() {
-        // Implementar exportación de datos
-    }
-    
-    private func backupAction() {
-        // Implementar copia de seguridad
-    }
-    
-    private func privacyAction() {
-        // Implementar configuración de privacidad
-    }
-    
-    private func helpCenterAction() {
-        // Implementar centro de ayuda
-    }
-    
-    private func contactSupportAction() {
-        // Implementar contacto con soporte
-    }
-    
-    private func rateAppAction() {
-        // Implementar valoración de app
-    }
-    
-    private func termsAction() {
-        // Implementar términos y condiciones
+    private func deleteAllGroups() {
+        withAnimation {
+            for group in allGroups {
+                modelContext.delete(group)
+            }
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+        }
     }
 }
 
